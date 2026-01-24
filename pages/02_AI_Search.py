@@ -343,11 +343,16 @@ if user_message:
         with st.container():
             response = st.write_stream(response_gen)
             
-            # Append source URLs at the end
+            # Append source URLs at the end with descriptive titles
             if source_urls:
                 response += "\n\nRelated links:\n"
-                for url in source_urls:
-                    response += f"- [{url}]({url})\n"
+                for idx, url in enumerate(source_urls, start=1):
+                    # Extract descriptive name from URL or use generic title
+                    if "iitj.ac.in" in url.lower():
+                        link_text = "IIT Jodhpur Official Page"
+                    else:
+                        link_text = f"Source Document {idx}"
+                    response += f"- [{link_text}]({url})\n"
             
             # Add to chat history
             st.session_state.messages.append({"role": "user", "content": user_message})
