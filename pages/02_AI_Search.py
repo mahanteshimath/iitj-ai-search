@@ -317,8 +317,17 @@ if user_message:
             try:
                 results = run_search(user_message)
                 search_context = build_search_context(results)
+                
+                # Extract unique source URLs from results
+                source_urls = []
+                for row in results:
+                    row_dict = normalize_row(row)
+                    url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
+                    if url and url not in source_urls:
+                        source_urls.append(url)
             except Exception as exc:
                 search_context = f"Error searching documents: {exc}"
+                source_urls = []
         
         # Build prompt with context and history
         recent_history = st.session_state.messages[-HISTORY_LENGTH:] if len(st.session_state.messages) > 0 else []
@@ -333,6 +342,12 @@ if user_message:
         # Stream the response
         with st.container():
             response = st.write_stream(response_gen)
+            
+            # Append source URLs at the end
+            if source_urls:
+                response += "\n\nRelated links:\n"
+                for url in source_urls:
+                    response += f"- [{url}]({url})\n"
             
             # Add to chat history
             st.session_state.messages.append({"role": "user", "content": user_message})
