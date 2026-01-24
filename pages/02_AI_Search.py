@@ -36,7 +36,7 @@ root = Root(session)
 DB = "IITJ"
 SCHEMA = "MH"
 SEARCH_SERVICE = "IITJ_AI_SEARCH"
-MODEL = "claude-4-5-sonnet"
+MODEL = "llama3.1-70b"
 HISTORY_LENGTH = 5
 
 INSTRUCTIONS = textwrap.dedent("""
