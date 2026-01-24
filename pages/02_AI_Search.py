@@ -3,6 +3,8 @@ from htbuilder.units import rem
 from htbuilder import div, styles
 from snowflake.snowpark.context import get_active_session
 from snowflake.core import Root
+from snowflake.cortex import complete
+import textwrap
 
 st.set_page_config(page_title="IITJ AI Search", page_icon="✨", layout="wide")
 
@@ -34,6 +36,21 @@ root = Root(session)
 DB = "IITJ"
 SCHEMA = "MH"
 SEARCH_SERVICE = "IITJ_AI_SEARCH"
+MODEL = "claude-4-5-sonnet"
+HISTORY_LENGTH = 5
+
+INSTRUCTIONS = textwrap.dedent("""
+    - You are a helpful AI assistant focused on answering questions about IIT Jodhpur.
+    - You will be given search results from IIT Jodhpur documents as context inside <search_results> tags.
+    - Use the context and conversation history to provide accurate, coherent answers.
+    - Use markdown formatting: headers (starting with ##), code blocks, bullet points, and backticks for inline code.
+    - Don't start responses with a markdown header.
+    - Be brief but clear and informative.
+    - Provide specific details from the search results.
+    - If the search results don't contain relevant information, say so clearly.
+    - Include source links at the end when available.
+    - Don't say things like "according to the provided context" or "based on the search results".
+""")
 
 def get_indexed_columns() -> list[str]:
     try:
@@ -139,14 +156,15 @@ def clean_text(value):
         .replace("\\t", "\t")
     )
 
-def format_results(results: list[dict]) -> str:
+def build_search_context(results: list[dict]) -> str:
+    """Build context string from search results for LLM prompt."""
     if not results:
-        return "No results found."
+        return "No relevant documents found."
 
-    blocks = []
+    context_blocks = []
     for idx, row in enumerate(results, start=1):
         row_dict = normalize_row(row)
-        title = clean_text(row_dict.get("TITLE") or row_dict.get("FILE_NAME") or f"Result {idx}")
+        title = clean_text(row_dict.get("TITLE") or row_dict.get("FILE_NAME") or f"Document {idx}")
         source_url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
         snippet = clean_text(
             row_dict.get("CONTENT")
@@ -154,26 +172,65 @@ def format_results(results: list[dict]) -> str:
             or row_dict.get("PAGE_CHUNK")
         )
 
-        block_lines = [f"### {title}"]
+        block = f"[Document {idx} - {title}]"
         if snippet:
-            block_lines.append(snippet)
-
-        extras = {
-            k: v
-            for k, v in row_dict.items()
-            if k not in {"TITLE", "FILE_NAME", "SOURCE_URL", "SOURCE", "CONTENT", "CHUNK", "PAGE_CHUNK"}
-        }
-        if extras:
-            for key, value in extras.items():
-                block_lines.append(f"- **{key}**: {clean_text(value)}")
-
+            block += f"\n{snippet}"
         if source_url:
-            block_lines.append("Related links:")
-            block_lines.append(f"- [Source]({source_url})")
+            block += f"\nSource: {source_url}"
 
-        blocks.append("\n\n".join(block_lines))
+        context_blocks.append(block)
 
-    return "\n\n---\n\n".join(blocks)
+    return "\n\n".join(context_blocks)
+
+def history_to_text(chat_history):
+    """Converts chat history into a string."""
+    return "\n".join(f"[{h['role']}]: {h['content']}" for h in chat_history)
+
+def build_prompt(question: str, search_context: str, recent_history: str = None) -> str:
+    """Build the complete prompt for the LLM."""
+    prompt_parts = [f"<instructions>\n{INSTRUCTIONS}\n</instructions>"]
+    
+    if search_context:
+        prompt_parts.append(f"<search_results>\n{search_context}\n</search_results>")
+    
+    if recent_history:
+        prompt_parts.append(f"<recent_conversation>\n{recent_history}\n</recent_conversation>")
+    
+    prompt_parts.append(f"<question>\n{question}\n</question>")
+    
+    return "\n\n".join(prompt_parts)
+
+def get_response(prompt: str):
+    """Get streaming response from LLM."""
+    return complete(
+        MODEL,
+        prompt,
+        stream=True,
+        session=session,
+    )
+
+def show_feedback_controls(message_index):
+    """Shows the 'How did I do?' control."""
+    st.write("")
+
+    with st.popover("How did I do?"):
+        with st.form(key=f"feedback-{message_index}", border=False):
+            with st.container(gap=None):
+                st.markdown(":small[Rating]")
+                rating = st.feedback(options="stars")
+
+            details = st.text_area("More information (optional)")
+
+            if st.checkbox("Include chat history with my feedback", True):
+                relevant_history = st.session_state.messages[:message_index]
+            else:
+                relevant_history = []
+
+            ""  # Add some space
+
+            if st.form_submit_button("Send feedback"):
+                st.success("Thank you for your feedback!")
+                pass
 
 def run_search(question: str) -> list[dict]:
     cortex_search_service = (
@@ -239,24 +296,50 @@ with title_row:
 
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
+        if message["role"] == "assistant":
+            st.container()  # Fix ghost message bug
+        
         st.markdown(message["content"])
+        
+        if message["role"] == "assistant":
+            show_feedback_controls(i)
 
 if user_message:
+    # Escape LaTeX characters
+    user_message = user_message.replace("$", r"\$")
+    
     with st.chat_message("user"):
         st.text(user_message)
 
     with st.chat_message("assistant"):
-        with st.spinner("Searching..."):
+        # Search for relevant context
+        with st.spinner("Searching documents..."):
             try:
                 results = run_search(user_message)
-                response = format_results(results)
+                search_context = build_search_context(results)
             except Exception as exc:
-                response = f"Search failed: {exc}"
-
-        st.markdown(response)
-
-        st.session_state.messages.append({"role": "user", "content": user_message})
-        st.session_state.messages.append({"role": "assistant", "content": response})
+                search_context = f"Error searching documents: {exc}"
+        
+        # Build prompt with context and history
+        recent_history = st.session_state.messages[-HISTORY_LENGTH:] if len(st.session_state.messages) > 0 else []
+        recent_history_str = history_to_text(recent_history) if recent_history else None
+        
+        full_prompt = build_prompt(user_message, search_context, recent_history_str)
+        
+        # Get LLM response
+        with st.spinner("Thinking..."):
+            response_gen = get_response(full_prompt)
+        
+        # Stream the response
+        with st.container():
+            response = st.write_stream(response_gen)
+            
+            # Add to chat history
+            st.session_state.messages.append({"role": "user", "content": user_message})
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            
+            # Show feedback
+            show_feedback_controls(len(st.session_state.messages) - 1)
 
 footer="""<style>
 
