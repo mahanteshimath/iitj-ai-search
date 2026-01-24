@@ -1,0 +1,5 @@
+streamlit
+snowflake-ml-python
+snowflake-snowpark-python
+pypdf
+htbuilder
