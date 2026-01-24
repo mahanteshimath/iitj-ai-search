@@ -168,7 +168,8 @@ def format_results(results: list[dict]) -> str:
                 block_lines.append(f"- **{key}**: {clean_text(value)}")
 
         if source_url:
-            block_lines.append(f"[Source]({source_url})")
+            block_lines.append("Related links:")
+            block_lines.append(f"- [Source]({source_url})")
 
         blocks.append("\n\n".join(block_lines))
 
