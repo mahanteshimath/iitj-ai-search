@@ -155,8 +155,6 @@ def format_results(results: list[dict]) -> str:
         )
 
         block_lines = [f"### {title}"]
-        if source_url:
-            block_lines.append(f"[Source]({source_url})")
         if snippet:
             block_lines.append(snippet)
 
@@ -168,6 +166,9 @@ def format_results(results: list[dict]) -> str:
         if extras:
             for key, value in extras.items():
                 block_lines.append(f"- **{key}**: {clean_text(value)}")
+
+        if source_url:
+            block_lines.append(f"[Source]({source_url})")
 
         blocks.append("\n\n".join(block_lines))
 
