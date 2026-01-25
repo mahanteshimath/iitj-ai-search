@@ -1,12 +1,19 @@
 import streamlit as st
 from htbuilder.units import rem
 from htbuilder import div, styles
+from pathlib import Path
 from snowflake.snowpark.context import get_active_session
 from snowflake.core import Root
 from snowflake.cortex import complete
 import textwrap
 
 st.set_page_config(page_title="IITJ AI Search", page_icon="✨", layout="wide")
+
+# Sidebar logo
+logo_path = Path(__file__).parent.parent / "resources" / "iitj.jpg"
+if logo_path.exists():
+    st.sidebar.image(str(logo_path), use_container_width=True)
+    st.sidebar.markdown("---")
 
 st.markdown(
     '''

@@ -1,10 +1,14 @@
 import streamlit as st
+from pathlib import Path
 
-st.logo(
-    image="https://upload.wikimedia.org/wikipedia/en/4/41/Flag_of_India.svg",
-    link="https://www.linkedin.com/in/mahantesh-hiremath/",
-    icon_image="https://upload.wikimedia.org/wikipedia/en/4/41/Flag_of_India.svg"
-)
+# IITJ Logo
+logo_path = Path(__file__).parent / "resources" / "iitj.jpg"
+if logo_path.exists():
+    st.logo(
+        image=str(logo_path),
+        link="https://www.iitj.ac.in/",
+        icon_image=str(logo_path)
+    )
 
 st.set_page_config(
     page_title="IIT JODHPUR SMART SEARCH",

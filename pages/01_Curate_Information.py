@@ -1,9 +1,16 @@
 import streamlit as st
 import os
 import io
+from pathlib import Path
 from snowflake.snowpark.context import get_active_session
 
 st.set_page_config(page_title="Curate Information", page_icon="📋", layout="wide")
+
+# Sidebar logo
+logo_path = Path(__file__).parent.parent / "resources" / "iitj.jpg"
+if logo_path.exists():
+    st.sidebar.image(str(logo_path), use_container_width=True)
+    st.sidebar.markdown("---")
 
 st.title(":material/description: Document Metadata Uploader")
 st.caption("Upload any file and store metadata in Snowflake")
