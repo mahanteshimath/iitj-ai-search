@@ -50,9 +50,18 @@ root = Root(session)
 DB = "IITJ"
 SCHEMA = "MH"
 SEARCH_SERVICE = "IITJ_AI_SEARCH"
-MODEL = "llama3.1-70b"
 HISTORY_LENGTH = 5
 FEEDBACK_TABLE = "IITJ_RAG_FFEDBACK"
+LLM_MODELS = [
+    "llama3-8b",
+    "llama3-70b",
+    "mistral-7b",
+    "mixtral-8x7b",
+    "claude-3-5-sonnet",
+    "claude-haiku-4-5",
+    "openai-gpt-5",
+    "openai-gpt-5-mini",
+]
 
 INSTRUCTIONS = textwrap.dedent("""
     - You are a helpful AI assistant focused on answering questions about IIT Jodhpur.
@@ -122,6 +131,9 @@ with title_row:
     )
 
 st.caption("This is a smart way to Search IIT Jodhpur documents uploaded by users")
+
+st.title(":material/compare: Select Models")
+selected_model = st.selectbox("Model", LLM_MODELS, index=1)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -242,10 +254,10 @@ def build_prompt(question: str, search_context: str, recent_history: str = None)
     
     return "\n\n".join(prompt_parts)
 
-def get_response(prompt: str):
+def get_response(prompt: str, model: str):
     """Get streaming response from LLM."""
     return complete(
-        MODEL,
+        model,
         prompt,
         stream=True,
         session=session,
@@ -334,18 +346,10 @@ if not user_message:
     if user_just_clicked_suggestion:
         user_message = SUGGESTIONS[st.session_state.selected_suggestion]
 
-with title_row:
-
-    def clear_conversation():
-        st.session_state.messages = []
-        st.session_state.initial_question = None
-        st.session_state.selected_suggestion = None
-
-    st.button(
-        "Restart",
-        icon=":material/refresh:",
-        on_click=clear_conversation,
-    )
+def clear_conversation():
+    st.session_state.messages = []
+    st.session_state.initial_question = None
+    st.session_state.selected_suggestion = None
 
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
@@ -394,7 +398,7 @@ if user_message:
         
         # Get LLM response
         with st.spinner("Thinking..."):
-            response_gen = get_response(full_prompt)
+            response_gen = get_response(full_prompt, selected_model)
         
         # Stream the response
         with st.container():
@@ -419,6 +423,13 @@ if user_message:
 
 footer="""<style>
 
+button[aria-label="Restart"] {
+position: fixed;
+right: 1.5rem;
+bottom: 1.5rem;
+z-index: 1000;
+}
+
 .footer {
 position: fixed;
 left: 0;
@@ -434,3 +445,9 @@ text-align: center;
 </div>
 """
 st.markdown(footer, unsafe_allow_html=True)
+
+st.button(
+    "Restart",
+    icon=":material/refresh:",
+    on_click=clear_conversation,
+)
