@@ -92,7 +92,7 @@ SUGGESTIONS = {
     ":red[:material/contacts:] Contact details": "Contact details for IIT Jodhpur",
 }
 
-st.html(div(style=styles(font_size=rem(5), line_height=1))[["❉"]])
+# st.html(div(style=styles(font_size=rem(5), line_height=1))[["❉"]])
 
 title_row = st.container(
     horizontal=True,
@@ -106,7 +106,7 @@ with title_row:
         width="stretch",
     )
 
-st.caption("Search IIT Jodhpur documents uploaded by users using a Cortex Search Service")
+st.caption("This is a smart way to Search IIT Jodhpur documents uploaded by users")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
