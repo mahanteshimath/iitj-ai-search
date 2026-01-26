@@ -52,6 +52,7 @@ SCHEMA = "MH"
 SEARCH_SERVICE = "IITJ_AI_SEARCH"
 MODEL = "llama3.1-70b"
 HISTORY_LENGTH = 5
+FEEDBACK_TABLE = "IITJ_RAG_FFEDBACK"
 
 INSTRUCTIONS = textwrap.dedent("""
     - You are a helpful AI assistant focused on answering questions about IIT Jodhpur.
@@ -83,6 +84,20 @@ def get_indexed_columns() -> list[str]:
     return []
 
 indexed_columns = get_indexed_columns()
+
+def ensure_feedback_table():
+    session.sql(
+        f"""
+        CREATE TABLE IF NOT EXISTS {DB}.{SCHEMA}.{FEEDBACK_TABLE} (
+            FEEDBACK_ID NUMBER AUTOINCREMENT,
+            HISTORY_OF_CHAT VARCHAR,
+            MORE_INFORMATION VARCHAR,
+            FEEDBACK_GIVEN_ON TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+        )
+        """
+    ).collect()
+
+ensure_feedback_table()
 
 SUGGESTIONS = {
     ":blue[:material/local_library:] List all faculty": "List all faculty",
@@ -249,8 +264,19 @@ def show_feedback_controls(message_index):
             ""  # Add some space
 
             if st.form_submit_button("Send feedback"):
-                st.success("Thank you for your feedback!")
-                pass
+                history_text = history_to_text(relevant_history) if relevant_history else None
+                try:
+                    session.sql(
+                        f"""
+                        INSERT INTO {DB}.{SCHEMA}.{FEEDBACK_TABLE}
+                        (HISTORY_OF_CHAT, MORE_INFORMATION)
+                        SELECT ?, ?
+                        """,
+                        params=[history_text, details],
+                    ).collect()
+                    st.success("Thank you for your feedback!")
+                except Exception as exc:
+                    st.error(f"Failed to store feedback: {exc}")
 
 def run_search(question: str) -> list[dict]:
     cortex_search_service = (
