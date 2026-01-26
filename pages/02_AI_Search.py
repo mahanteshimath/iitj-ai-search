@@ -12,7 +12,7 @@ st.set_page_config(page_title="IITJ AI Search", page_icon="✨", layout="wide")
 # Sidebar logo
 logo_path = Path(__file__).parent.parent / "resources" / "iitj.jpg"
 if logo_path.exists():
-    st.sidebar.image(str(logo_path), use_container_width=True)
+    st.sidebar.image(str(logo_path), width='stretch')
     st.sidebar.markdown("---")
 
 st.markdown(
@@ -31,12 +31,15 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Connect to Snowflake
-try:
-    session = get_active_session()
-except Exception:
-    from snowflake.snowpark import Session
-    session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
+# Connect to Snowflake and save in session_state
+if "snowflake_session" not in st.session_state:
+    try:
+        st.session_state.snowflake_session = get_active_session()
+    except Exception:
+        from snowflake.snowpark import Session
+        st.session_state.snowflake_session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
+
+session = st.session_state.snowflake_session
 
 root = Root(session)
 
