@@ -85,6 +85,8 @@ if uploaded_file and st.button("Save Metadata", type="primary"):
                 st.warning("🔄 Session expired. Reconnecting...")
                 if "get_snowflake_session" in st.session_state:
                     session = st.session_state.get_snowflake_session()
+                    st.session_state.snowflake_session = session
+                    st.toast("✅ Reconnected to Snowflake", icon="✅")
                 # Retry table creation
                 try:
                     session.sql(create_table_sql).collect()
@@ -113,8 +115,21 @@ if uploaded_file and st.button("Save Metadata", type="primary"):
             """
             session.sql(insert_sql).collect()
         except Exception as e:
-            st.error(f"❌ Failed to insert metadata: {str(e)}")
-            st.stop()
+            error_msg = str(e)
+            # Check if it's an authentication error and retry
+            if "Authentication token has expired" in error_msg or "390114" in error_msg:
+                st.warning("🔄 Session expired during insert. Reconnecting...")
+                if "get_snowflake_session" in st.session_state:
+                    session = st.session_state.get_snowflake_session()
+                    st.session_state.snowflake_session = session
+                try:
+                    session.sql(insert_sql).collect()
+                except Exception as retry_error:
+                    st.error(f"❌ Failed to insert metadata after reconnection: {str(retry_error)}")
+                    st.stop()
+            else:
+                st.error(f"❌ Failed to insert metadata: {error_msg}")
+                st.stop()
 
         try:
             # Determine final filename based on compression setting
@@ -140,8 +155,32 @@ if uploaded_file and st.button("Save Metadata", type="primary"):
                 f"✅ Saved metadata for '{file_name}' into {database}.{schema}.{table_name}. "
                 f"Uploaded to {database}.{schema}.IITJ_INFO_STAGE."
             )
+            st.balloons()
         except Exception as exc:
-            st.warning(f"⚠️ Metadata saved but failed to upload {file_name} to stage: {exc}")
+            error_msg = str(exc)
+            # Check if it's an authentication error and retry
+            if "Authentication token has expired" in error_msg or "390114" in error_msg:
+                st.warning("🔄 Session expired during upload. Reconnecting...")
+                if "get_snowflake_session" in st.session_state:
+                    session = st.session_state.get_snowflake_session()
+                    st.session_state.snowflake_session = session
+                try:
+                    file_stream = io.BytesIO(uploaded_file.getvalue())
+                    session.file.put_stream(
+                        file_stream,
+                        stage_path,
+                        overwrite=True,
+                        auto_compress=auto_compress
+                    )
+                    st.success(
+                        f"✅ Saved metadata for '{file_name}' into {database}.{schema}.{table_name}. "
+                        f"Uploaded to {database}.{schema}.IITJ_INFO_STAGE."
+                    )
+                    st.balloons()
+                except Exception as retry_error:
+                    st.warning(f"⚠️ Metadata saved but failed to upload {file_name} to stage: {retry_error}")
+            else:
+                st.warning(f"⚠️ Metadata saved but failed to upload {file_name} to stage: {error_msg}")
 
 st.divider()
 st.caption("Curate Information: Upload file metadata to Snowflake")

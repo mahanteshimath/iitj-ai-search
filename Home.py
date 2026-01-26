@@ -44,8 +44,11 @@ def get_snowflake_session():
 
 # Establish connection at app launch
 if "snowflake_session" not in st.session_state:
-    st.session_state.snowflake_session = get_snowflake_session()
-    st.session_state.get_snowflake_session = get_snowflake_session
+    with st.spinner("🔌 Connecting to Snowflake..."):
+        st.session_state.snowflake_session = get_snowflake_session()
+        st.session_state.get_snowflake_session = get_snowflake_session
+    st.balloons()
+    st.toast("✅ Connected to Snowflake!", icon="✅")
 
 # Pages
 curate = st.Page("pages/01_Curate_Information.py", title="Curate Information", icon="📋", default=True)
