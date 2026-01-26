@@ -1,6 +1,7 @@
 import streamlit as st
-import os
 import io
+import os
+import time
 from pathlib import Path
 from snowflake.snowpark.context import get_active_session
 
@@ -16,184 +17,131 @@ st.title(":material/description: Document Metadata Uploader")
 st.caption("Upload any file and store metadata in Snowflake")
 st.markdown("---")
 
-# Get Snowflake session from app state (initialized in Home.py)
+# Snowflake connection (reuse session from Home.py if available)
 def get_or_refresh_session():
-    """Get session and ensure it's valid"""
-    if "get_snowflake_session" not in st.session_state:
-        st.error("❌ Snowflake session not initialized. Please restart the app.")
-        st.stop()
-    
-    # Get a fresh session (will validate or recreate as needed)
-    fresh_session = st.session_state.get_snowflake_session()
-    st.session_state.snowflake_session = fresh_session
-    return fresh_session
+    if "get_snowflake_session" in st.session_state:
+        session = st.session_state.get_snowflake_session()
+        st.session_state.snowflake_session = session
+        return session
+    try:
+        return get_active_session()
+    except Exception:
+        from snowflake.snowpark import Session
+        return Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
 
 session = get_or_refresh_session()
 
-st.subheader("🧾 Metadata Settings")
+# Default configuration
+DATABASE = "IITJ"
+SCHEMA = "MH"
+TABLE_NAME = "UPLOADED_FILES_METADATA"
+FULL_STAGE_NAME = f"{DATABASE}.{SCHEMA}.IITJ_INFO_STAGE"
+STAGE_NAME = f"@{FULL_STAGE_NAME}"
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    uploaded_by = st.text_input("Uploaded By", value="m25ai2134@iitj.ac.in")
-with col2:
-    source_url = st.text_input("Source URL", placeholder="https://...")
-with col3:
-    auto_compress = st.checkbox("Auto-compress files", value=False, 
-                                  help="Enable gzip compression for uploaded files")
+def ensure_stage_and_table():
+    session.sql(
+        f"""
+        CREATE STAGE IF NOT EXISTS {FULL_STAGE_NAME}
+        ENCRYPTION = ( TYPE = 'SNOWFLAKE_SSE' )
+        DIRECTORY = ( ENABLE = true )
+        """
+    ).collect()
 
-default_short_description = st.text_input(
-    "Default Short Description",
-    placeholder="Optional default description for all files"
-)
+    session.sql(
+        f"""
+        CREATE TABLE IF NOT EXISTS {DATABASE}.{SCHEMA}.{TABLE_NAME} (
+            DOC_ID NUMBER AUTOINCREMENT,
+            FILE_NAME VARCHAR,
+            SHORT_DESCRIPTION VARCHAR,
+            SOURCE_URL VARCHAR,
+            FILE_TYPE VARCHAR,
+            FILE_SIZE NUMBER,
+            UPLOADED_BY VARCHAR,
+            UPLOAD_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+        )
+        """
+    ).collect()
 
-st.subheader("📁 Upload File")
-uploaded_file = st.file_uploader(
-    "Choose a file",
-    type=None,
-    accept_multiple_files=False
-)
+ensure_stage_and_table()
 
-short_description = default_short_description
-if uploaded_file:
-    st.markdown("### 📝 File Description")
+with st.container(border=True):
+    st.subheader(":material/upload: Upload a file")
+
+    uploaded_by = st.text_input("Uploaded by", placeholder="Your name")
     short_description = st.text_input(
-        f"{uploaded_file.name}",
-        value=default_short_description,
-        key="file_desc"
+        "Short description",
+        placeholder="Brief description (optional)",
+        help="If left empty, file name will be used."
+    )
+    source_url = st.text_input(
+        "Source URL",
+        placeholder="https://...",
+        help="Provide the source link for this document."
     )
 
-if uploaded_file and st.button("Save Metadata", type="primary"):
-    if not uploaded_by:
-        st.warning("⚠️ Please provide an 'Uploaded By' value.")
-    else:
-        database = "IITJ"
-        schema = "MH"
-        table_name = "UPLOADED_FILES_METADATA"
+    uploaded_file = st.file_uploader(
+        "Choose a file",
+        help="Any file type is supported."
+    )
 
-        # Ensure table exists (use IF NOT EXISTS to avoid permission issues)
-        try:
-            create_table_sql = f"""
-            CREATE TABLE IF NOT EXISTS {database}.{schema}.{table_name} (
-                DOC_ID NUMBER AUTOINCREMENT,
-                FILE_NAME VARCHAR,
-                SHORT_DESCRIPTION VARCHAR,
-                SOURCE_URL VARCHAR,
-                FILE_TYPE VARCHAR,
-                FILE_SIZE NUMBER,
-                UPLOADED_BY VARCHAR,
-                UPLOAD_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
-            )
-            """
-            session.sql(create_table_sql).collect()
-        except Exception as e:
-            error_msg = str(e)
-            # Check if it's an authentication error
-            if "Authentication token has expired" in error_msg or "390114" in error_msg:
-                st.warning("🔄 Session expired. Reconnecting...")
-                # Force delete the expired session to ensure fresh connection
-                if "snowflake_session" in st.session_state:
-                    del st.session_state.snowflake_session
-                session = get_or_refresh_session()
-                st.toast("✅ Reconnected to Snowflake", icon="✅")
-                # Retry table creation with fresh session
-                try:
-                    session.sql(create_table_sql).collect()
-                except Exception as retry_error:
-                    st.error(f"❌ Failed to create table after reconnection: {str(retry_error)}")
-                    st.info("💡 Please ensure the database and schema exist, and you have CREATE TABLE privileges.")
-                    st.stop()
-            else:
-                st.error(f"❌ Failed to create table: {error_msg}")
-                st.info("💡 Please ensure the database and schema exist, and you have CREATE TABLE privileges.")
-                st.stop()
+    if uploaded_file:
+        st.write(f"**File:** {uploaded_file.name}")
+        st.write(f"**Size:** {uploaded_file.size} bytes")
 
-        def escape_sql(value: str) -> str:
-            return value.replace("'", "''") if value else ""
+    if st.button(":material/cloud_upload: Upload to Snowflake", type="primary"):
+        if not uploaded_file:
+            st.error("Please choose a file to upload.")
+            st.stop()
+        if not uploaded_by.strip():
+            st.error("Please enter who uploaded the file.")
+            st.stop()
+        if not source_url.strip():
+            st.error("Please provide the source URL.")
+            st.stop()
 
         file_name = uploaded_file.name
-        file_type = uploaded_file.type or os.path.splitext(file_name)[1].lstrip(".")
+        file_ext = os.path.splitext(file_name)[1].lstrip(".")
         file_size = uploaded_file.size
+        description = short_description.strip() or file_name
 
-        try:
-            insert_sql = f"""
-            INSERT INTO {database}.{schema}.{table_name}
-            (FILE_NAME, SHORT_DESCRIPTION, SOURCE_URL, FILE_TYPE, FILE_SIZE, UPLOADED_BY)
-            VALUES ('{escape_sql(file_name)}', '{escape_sql(short_description)}',
-                    '{escape_sql(source_url)}', '{escape_sql(file_type)}', {file_size}, '{escape_sql(uploaded_by)}')
-            """
-            session.sql(insert_sql).collect()
-        except Exception as e:
-            error_msg = str(e)
-            # Check if it's an authentication error and retry
-            if "Authentication token has expired" in error_msg or "390114" in error_msg:
-                st.warning("🔄 Session expired during insert. Reconnecting...")
-                # Force delete the expired session
-                if "snowflake_session" in st.session_state:
-                    del st.session_state.snowflake_session
-                session = get_or_refresh_session()
-                try:
-                    session.sql(insert_sql).collect()
-                except Exception as retry_error:
-                    st.error(f"❌ Failed to insert metadata after reconnection: {str(retry_error)}")
-                    st.stop()
-            else:
-                st.error(f"❌ Failed to insert metadata: {error_msg}")
+        with st.spinner(":material/upload: Uploading file to Snowflake stage..."):
+            try:
+                timestamp = int(time.time())
+                staged_name = f"{Path(file_name).stem}_{timestamp}{Path(file_name).suffix}"
+                file_stream = io.BytesIO(uploaded_file.getvalue())
+                session.file.put_stream(
+                    file_stream,
+                    f"{STAGE_NAME}/{staged_name}",
+                    overwrite=True,
+                    auto_compress=False,
+                )
+            except Exception as exc:
+                st.error(f"Upload failed: {exc}")
                 st.stop()
 
-        try:
-            # Determine final filename based on compression setting
-            if auto_compress:
-                stage_file_name = file_name if file_name.lower().endswith(".gz") else f"{file_name}.gz"
-            else:
-                stage_file_name = file_name
-            
-            stage_path = f"@{database}.{schema}.IITJ_INFO_STAGE/{stage_file_name}"
-            
-            # Upload file to stage
-            file_bytes = uploaded_file.getvalue()
-            file_stream = io.BytesIO(file_bytes)
-            
-            session.file.put_stream(
-                file_stream,
-                stage_path,
-                overwrite=True,
-                auto_compress=auto_compress
-            )
-            
-            st.success(
-                f"✅ Saved metadata for '{file_name}' into {database}.{schema}.{table_name}. "
-                f"Uploaded to {database}.{schema}.IITJ_INFO_STAGE."
-            )
-            st.balloons()
-        except Exception as exc:
-            error_msg = str(exc)
-            # Check if it's an authentication error and retry
-            if "Authentication token has expired" in error_msg or "390114" in error_msg:
-                st.warning("🔄 Session expired during upload. Reconnecting...")
-                # Force delete the expired session
-                if "snowflake_session" in st.session_state:
-                    del st.session_state.snowflake_session
-                session = get_or_refresh_session()
-                try:
-                    file_stream = io.BytesIO(uploaded_file.getvalue())
-                    session.file.put_stream(
-                        file_stream,
-                        stage_path,
-                        overwrite=True,
-                        auto_compress=auto_compress
-                    )
-                    st.success(
-                        f"✅ Saved metadata for '{file_name}' into {database}.{schema}.{table_name}. "
-                        f"Uploaded to {database}.{schema}.IITJ_INFO_STAGE."
-                    )
-                    st.balloons()
-                except Exception as retry_error:
-                    st.warning(f"⚠️ Metadata saved but failed to upload {file_name} to stage: {retry_error}")
-            else:
-                st.warning(f"⚠️ Metadata saved but failed to upload {file_name} to stage: {error_msg}")
+        with st.spinner(":material/database: Writing metadata..."):
+            try:
+                insert_sql = f"""
+                INSERT INTO {DATABASE}.{SCHEMA}.{TABLE_NAME}
+                (FILE_NAME, SHORT_DESCRIPTION, SOURCE_URL, FILE_TYPE, FILE_SIZE, UPLOADED_BY)
+                SELECT
+                    ?, ?, ?, ?, ?, ?
+                """
+                session.sql(
+                    insert_sql,
+                    params=[
+                        file_name,
+                        description,
+                        source_url.strip(),
+                        file_ext,
+                        file_size,
+                        uploaded_by.strip(),
+                    ],
+                ).collect()
+                st.success("File uploaded and metadata saved.")
+            except Exception as exc:
+                st.error(f"Metadata insert failed: {exc}")
 
-st.divider()
-st.caption("Curate Information: Upload file metadata to Snowflake")
 
 footer = """<style>
 .footer {
