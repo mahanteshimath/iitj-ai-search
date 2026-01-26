@@ -6,6 +6,7 @@ from snowflake.snowpark.context import get_active_session
 from snowflake.core import Root
 from snowflake.cortex import complete
 import textwrap
+import requests
 
 st.set_page_config(page_title="IITJ AI Search", page_icon="✨", layout="wide")
 
@@ -256,12 +257,21 @@ def build_prompt(question: str, search_context: str, recent_history: str = None)
 
 def get_response(prompt: str, model: str):
     """Get streaming response from LLM."""
-    return complete(
-        model,
-        prompt,
-        stream=True,
-        session=session,
-    )
+    try:
+        return complete(
+            model,
+            prompt,
+            stream=True,
+            session=session,
+        )
+    except requests.exceptions.HTTPError as exc:
+        st.error(
+            "Model request failed. Check if the selected model is available in your Snowflake account."
+        )
+        st.stop()
+    except Exception as exc:
+        st.error(f"Model request failed: {exc}")
+        st.stop()
 
 def show_feedback_controls(message_index):
     """Shows the 'How did I do?' control."""
