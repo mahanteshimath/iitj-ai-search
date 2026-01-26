@@ -351,6 +351,13 @@ def clear_conversation():
     st.session_state.initial_question = None
     st.session_state.selected_suggestion = None
 
+with title_row:
+    st.button(
+        "Restart",
+        icon=":material/refresh:",
+        on_click=clear_conversation,
+    )
+
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         if message["role"] == "assistant":
@@ -438,12 +445,3 @@ text-align: center;
 </div>
 """
 st.markdown(footer, unsafe_allow_html=True)
-
-with st.container():
-    _, right_col = st.columns([8, 1])
-    with right_col:
-        st.button(
-            "Restart",
-            icon=":material/refresh:",
-            on_click=clear_conversation,
-        )
