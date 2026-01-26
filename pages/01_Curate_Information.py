@@ -55,7 +55,7 @@ session = get_or_refresh_session()
 with st.sidebar:
     try:
         version = session.sql("SELECT CURRENT_VERSION()").collect()[0][0]
-        st.success(f"✅ Successfully connected! Snowflake Version: {version}")
+        st.success(f"✅ Successfully connected to Database")
     except Exception as exc:
         st.error(f"Snowflake connection failed: {exc}")
         st.stop()
@@ -143,8 +143,7 @@ with st.container(border=True):
 
         with st.spinner(":material/upload: Uploading file to Snowflake stage..."):
             try:
-                timestamp = int(time.time())
-                staged_name = f"{Path(file_name).stem}_{timestamp}{Path(file_name).suffix}"
+                staged_name = file_name
                 file_stream = io.BytesIO(uploaded_file.getvalue())
                 session.file.put_stream(
                     file_stream,
