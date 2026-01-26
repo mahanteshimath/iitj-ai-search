@@ -102,6 +102,64 @@ def ensure_stage_and_table():
 ensure_stage_and_table()
 
 with st.container(border=True):
+    st.subheader(":material/table: Uploaded Files Metadata")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        name_filter = st.text_input("File name contains", placeholder="e.g., faculty")
+    with col2:
+        uploader_filter = st.text_input("Uploaded by", placeholder="e.g., Monty")
+    with col3:
+        url_filter = st.text_input("Source URL contains", placeholder="e.g., iitj.ac.in")
+
+    limit = st.slider("Rows", min_value=1, max_value=200, value=25)
+
+    if st.button(":material/refresh: Refresh results"):
+        pass
+
+    where_clauses = []
+    params = []
+
+    if name_filter.strip():
+        where_clauses.append("FILE_NAME ILIKE ?")
+        params.append(f"%{name_filter.strip()}%")
+
+    if uploader_filter.strip():
+        where_clauses.append("UPLOADED_BY ILIKE ?")
+        params.append(f"%{uploader_filter.strip()}%")
+
+    if url_filter.strip():
+        where_clauses.append("SOURCE_URL ILIKE ?")
+        params.append(f"%{url_filter.strip()}%")
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    query_sql = f"""
+    SELECT
+        DOC_ID,
+        FILE_NAME,
+        SHORT_DESCRIPTION,
+        SOURCE_URL,
+        FILE_TYPE,
+        FILE_SIZE,
+        UPLOADED_BY,
+        UPLOAD_TIMESTAMP
+    FROM {DATABASE}.{SCHEMA}.{TABLE_NAME}
+    {where_sql}
+    ORDER BY UPLOAD_TIMESTAMP DESC
+    LIMIT {limit}
+    """
+
+    try:
+        rows = session.sql(query_sql, params=params).collect()
+        data = [r.as_dict() if hasattr(r, "as_dict") else dict(r) for r in rows]
+        st.dataframe(data, use_container_width=True, hide_index=True)
+    except Exception as exc:
+        st.error(f"Query failed: {exc}")
+
+st.markdown("---")
+
+with st.container(border=True):
     st.subheader(":material/upload: Upload a file")
 
     uploaded_by = st.text_input("Uploaded by", placeholder="Your name")
@@ -177,64 +235,6 @@ with st.container(border=True):
                 st.success("File uploaded and metadata saved.")
             except Exception as exc:
                 st.error(f"Metadata insert failed: {exc}")
-
-st.markdown("---")
-
-with st.container(border=True):
-    st.subheader(":material/table: Uploaded Files Metadata")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        name_filter = st.text_input("File name contains", placeholder="e.g., faculty")
-    with col2:
-        uploader_filter = st.text_input("Uploaded by", placeholder="e.g., Monty")
-    with col3:
-        url_filter = st.text_input("Source URL contains", placeholder="e.g., iitj.ac.in")
-
-    limit = st.slider("Rows", min_value=1, max_value=200, value=25)
-
-    if st.button(":material/refresh: Refresh results"):
-        pass
-
-    where_clauses = []
-    params = []
-
-    if name_filter.strip():
-        where_clauses.append("FILE_NAME ILIKE ?")
-        params.append(f"%{name_filter.strip()}%")
-
-    if uploader_filter.strip():
-        where_clauses.append("UPLOADED_BY ILIKE ?")
-        params.append(f"%{uploader_filter.strip()}%")
-
-    if url_filter.strip():
-        where_clauses.append("SOURCE_URL ILIKE ?")
-        params.append(f"%{url_filter.strip()}%")
-
-    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-
-    query_sql = f"""
-    SELECT
-        DOC_ID,
-        FILE_NAME,
-        SHORT_DESCRIPTION,
-        SOURCE_URL,
-        FILE_TYPE,
-        FILE_SIZE,
-        UPLOADED_BY,
-        UPLOAD_TIMESTAMP
-    FROM {DATABASE}.{SCHEMA}.{TABLE_NAME}
-    {where_sql}
-    ORDER BY UPLOAD_TIMESTAMP DESC
-    LIMIT {limit}
-    """
-
-    try:
-        rows = session.sql(query_sql, params=params).collect()
-        data = [r.as_dict() if hasattr(r, "as_dict") else dict(r) for r in rows]
-        st.dataframe(data, use_container_width=True, hide_index=True)
-    except Exception as exc:
-        st.error(f"Query failed: {exc}")
 
 
 footer = """<style>
