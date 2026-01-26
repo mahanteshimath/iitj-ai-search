@@ -185,6 +185,11 @@ def clean_text(value):
         .replace("\\t", "\t")
     )
 
+def normalize_source_url(url: str | None) -> str | None:
+    if not url or not isinstance(url, str):
+        return url
+    return url.replace("/main/en/facultymembers", "/main/en/faculty-members")
+
 def build_search_context(results: list[dict]) -> str:
     """Build context string from search results for LLM prompt."""
     if not results:
@@ -194,7 +199,9 @@ def build_search_context(results: list[dict]) -> str:
     for idx, row in enumerate(results, start=1):
         row_dict = normalize_row(row)
         title = clean_text(row_dict.get("TITLE") or row_dict.get("FILE_NAME") or f"Document {idx}")
-        source_url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
+        source_url = normalize_source_url(
+            clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
+        )
         uploaded_by = clean_text(row_dict.get("UPLOADED_BY") or row_dict.get("UPLOADER"))
         chunk_index = row_dict.get("CHUNK_INDEX")
         snippet = clean_text(
@@ -368,7 +375,9 @@ if user_message:
                 source_urls = []
                 for row in results:
                     row_dict = normalize_row(row)
-                    url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
+                    url = normalize_source_url(
+                        clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
+                    )
                     if url and url not in source_urls:
                         source_urls.append(url)
                     if len(source_urls) >= 3:
