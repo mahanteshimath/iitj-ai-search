@@ -235,6 +235,18 @@ with st.container(border=True):
                 st.success("File uploaded and metadata saved.")
             except Exception as exc:
                 st.error(f"Metadata insert failed: {exc}")
+                st.stop()
+
+        with st.spinner("Embeddings getting generated..."):
+            try:
+                session.sql(f"LIST {STAGE_NAME}").collect()
+                session.sql(
+                    "CALL GENERATE_EMBEDDINGS_FOR_NEW_FILE(?)",
+                    params=[file_name],
+                ).collect()
+                st.success(f"Embeddings generated for {file_name}")
+            except Exception as exc:
+                st.error(f"Embedding generation failed: {exc}")
 
 
 footer = """<style>
