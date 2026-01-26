@@ -90,6 +90,9 @@ if uploaded_file and st.button("Save Metadata", type="primary"):
             # Check if it's an authentication error
             if "Authentication token has expired" in error_msg or "390114" in error_msg:
                 st.warning("🔄 Session expired. Reconnecting...")
+                # Force delete the expired session to ensure fresh connection
+                if "snowflake_session" in st.session_state:
+                    del st.session_state.snowflake_session
                 session = get_or_refresh_session()
                 st.toast("✅ Reconnected to Snowflake", icon="✅")
                 # Retry table creation with fresh session
@@ -124,6 +127,9 @@ if uploaded_file and st.button("Save Metadata", type="primary"):
             # Check if it's an authentication error and retry
             if "Authentication token has expired" in error_msg or "390114" in error_msg:
                 st.warning("🔄 Session expired during insert. Reconnecting...")
+                # Force delete the expired session
+                if "snowflake_session" in st.session_state:
+                    del st.session_state.snowflake_session
                 session = get_or_refresh_session()
                 try:
                     session.sql(insert_sql).collect()
@@ -164,6 +170,9 @@ if uploaded_file and st.button("Save Metadata", type="primary"):
             # Check if it's an authentication error and retry
             if "Authentication token has expired" in error_msg or "390114" in error_msg:
                 st.warning("🔄 Session expired during upload. Reconnecting...")
+                # Force delete the expired session
+                if "snowflake_session" in st.session_state:
+                    del st.session_state.snowflake_session
                 session = get_or_refresh_session()
                 try:
                     file_stream = io.BytesIO(uploaded_file.getvalue())
