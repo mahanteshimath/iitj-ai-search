@@ -21,15 +21,44 @@ st.markdown("---")
 def get_or_refresh_session():
     if "get_snowflake_session" in st.session_state:
         session = st.session_state.get_snowflake_session()
+        try:
+            session.sql("SELECT 1").collect()
+        except Exception:
+            session = st.session_state.get_snowflake_session()
         st.session_state.snowflake_session = session
         return session
+
+    if "default_session" in st.session_state:
+        try:
+            st.session_state.default_session.sql("SELECT 1").collect()
+            return st.session_state.default_session
+        except Exception:
+            del st.session_state.default_session
+
     try:
-        return get_active_session()
+        session = get_active_session()
+        session.sql("SELECT 1").collect()
     except Exception:
         from snowflake.snowpark import Session
-        return Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
+        connections = st.secrets.get("connections", {})
+        cfg = connections.get("my_example_connection") or connections.get("snowflake")
+        if not cfg:
+            raise Exception("No Snowflake connection configured in secrets.toml")
+        session = Session.builder.configs(cfg).create()
+        session.sql("SELECT 1").collect()
+
+    st.session_state.default_session = session
+    return session
 
 session = get_or_refresh_session()
+
+with st.sidebar:
+    try:
+        version = session.sql("SELECT CURRENT_VERSION()").collect()[0][0]
+        st.success(f"✅ Successfully connected! Snowflake Version: {version}")
+    except Exception as exc:
+        st.error(f"Snowflake connection failed: {exc}")
+        st.stop()
 
 # Default configuration
 DATABASE = "IITJ"
@@ -38,16 +67,24 @@ TABLE_NAME = "UPLOADED_FILES_METADATA"
 FULL_STAGE_NAME = f"{DATABASE}.{SCHEMA}.IITJ_INFO_STAGE"
 STAGE_NAME = f"@{FULL_STAGE_NAME}"
 
+def run_sql_with_refresh(sql: str):
+    global session
+    try:
+        return session.sql(sql).collect()
+    except Exception:
+        session = get_or_refresh_session()
+        return session.sql(sql).collect()
+
 def ensure_stage_and_table():
-    session.sql(
+    run_sql_with_refresh(
         f"""
         CREATE STAGE IF NOT EXISTS {FULL_STAGE_NAME}
         ENCRYPTION = ( TYPE = 'SNOWFLAKE_SSE' )
         DIRECTORY = ( ENABLE = true )
         """
-    ).collect()
+    )
 
-    session.sql(
+    run_sql_with_refresh(
         f"""
         CREATE TABLE IF NOT EXISTS {DATABASE}.{SCHEMA}.{TABLE_NAME} (
             DOC_ID NUMBER AUTOINCREMENT,
@@ -60,7 +97,7 @@ def ensure_stage_and_table():
             UPLOAD_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
         )
         """
-    ).collect()
+    )
 
 ensure_stage_and_table()
 
