@@ -54,7 +54,7 @@ SEARCH_SERVICE = "IITJ_AI_SEARCH"
 HISTORY_LENGTH = 5
 FEEDBACK_TABLE = "IITJ_RAG_FFEDBACK"
 LLM_MODELS = [
-    "claude-3-5-sonnet"
+    "claude-3-5-sonnet",
     "mistral-7b",
     "mixtral-8x7b"
     "claude-haiku-4-5",
