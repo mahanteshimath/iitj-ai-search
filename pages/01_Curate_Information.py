@@ -27,7 +27,7 @@ st.subheader("🧾 Metadata Settings")
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    uploaded_by = st.text_input("Uploaded By", placeholder="Your name or email")
+    uploaded_by = st.text_input("Uploaded By", value="m25ai2134@iitj.ac.in")
 with col2:
     source_url = st.text_input("Source URL", placeholder="https://...")
 with col3:
