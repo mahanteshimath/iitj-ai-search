@@ -25,11 +25,14 @@ except Exception:
 
 st.subheader("🧾 Metadata Settings")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
     uploaded_by = st.text_input("Uploaded By", placeholder="Your name or email")
 with col2:
     source_url = st.text_input("Source URL", placeholder="https://...")
+with col3:
+    auto_compress = st.checkbox("Auto-compress files", value=False, 
+                                  help="Enable gzip compression for uploaded files")
 
 default_short_description = st.text_input(
     "Default Short Description",
@@ -96,12 +99,23 @@ if uploaded_files and st.button("Save Metadata", type="primary"):
             inserted += 1
 
             try:
-                stage_file_name = file_name if file_name.lower().endswith(".gz") else f"{file_name}.gz"
+                # Determine final filename based on compression setting
+                if auto_compress:
+                    stage_file_name = file_name if file_name.lower().endswith(".gz") else f"{file_name}.gz"
+                else:
+                    stage_file_name = file_name
+                
                 stage_path = f"@{database}.{schema}.IITJ_INFO_STAGE/{stage_file_name}"
+                
+                # Upload file to stage
+                file_bytes = uploaded_file.getvalue()
+                file_stream = io.BytesIO(file_bytes)
+                
                 session.file.put_stream(
-                    io.BytesIO(uploaded_file.getvalue()),
+                    file_stream,
                     stage_path,
-                    overwrite=True
+                    overwrite=True,
+                    auto_compress=auto_compress
                 )
                 uploaded_to_stage += 1
             except Exception as exc:
