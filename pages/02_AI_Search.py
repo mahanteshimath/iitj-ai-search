@@ -145,7 +145,7 @@ with st.sidebar:
         selected_columns = []
         columns = st.text_input(
             "Columns (comma-separated)",
-            value="CONTENT,SOURCE_URL,TITLE,UPLOAD_TIMESTAMP",
+            value="SOURCE_URL,TITLE,UPLOADED_BY,CHUNK_INDEX,CONTENT",
             help="Use column names available in the search service."
         )
 
@@ -180,6 +180,8 @@ def build_search_context(results: list[dict]) -> str:
         row_dict = normalize_row(row)
         title = clean_text(row_dict.get("TITLE") or row_dict.get("FILE_NAME") or f"Document {idx}")
         source_url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
+        uploaded_by = clean_text(row_dict.get("UPLOADED_BY") or row_dict.get("UPLOADER"))
+        chunk_index = row_dict.get("CHUNK_INDEX")
         snippet = clean_text(
             row_dict.get("CONTENT")
             or row_dict.get("CHUNK")
@@ -187,6 +189,10 @@ def build_search_context(results: list[dict]) -> str:
         )
 
         block = f"[Document {idx} - {title}]"
+        if uploaded_by:
+            block += f"\nUploaded by: {uploaded_by}"
+        if chunk_index is not None:
+            block += f"\nChunk index: {chunk_index}"
         if snippet:
             block += f"\n{snippet}"
         if source_url:
@@ -332,13 +338,15 @@ if user_message:
                 results = run_search(user_message)
                 search_context = build_search_context(results)
                 
-                # Extract unique source URLs from results
+                # Extract unique source URLs from results (top 3)
                 source_urls = []
                 for row in results:
                     row_dict = normalize_row(row)
                     url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
                     if url and url not in source_urls:
                         source_urls.append(url)
+                    if len(source_urls) >= 3:
+                        break
             except Exception as exc:
                 search_context = f"Error searching documents: {exc}"
                 source_urls = []
@@ -359,9 +367,8 @@ if user_message:
             
             # Append source URLs at the end with descriptive titles
             if source_urls:
-                response += "\n\nRelated links:\n"
+                response += "\n\nTop sources:\n"
                 for idx, url in enumerate(source_urls, start=1):
-                    # Extract descriptive name from URL or use generic title
                     if "iitj.ac.in" in url.lower():
                         link_text = "IIT Jodhpur Official Page"
                     else:
