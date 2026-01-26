@@ -16,15 +16,12 @@ st.title(":material/description: Document Metadata Uploader")
 st.caption("Upload any file and store metadata in Snowflake")
 st.markdown("---")
 
-# Connect to Snowflake and save in session_state
-if "snowflake_session" not in st.session_state:
-    try:
-        st.session_state.snowflake_session = get_active_session()
-    except Exception:
-        from snowflake.snowpark import Session
-        st.session_state.snowflake_session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
-
-session = st.session_state.snowflake_session
+# Get Snowflake session from app state (initialized in Home.py)
+if "get_snowflake_session" in st.session_state:
+    session = st.session_state.get_snowflake_session()
+else:
+    st.error("❌ Snowflake session not initialized. Please restart the app.")
+    st.stop()
 
 st.subheader("🧾 Metadata Settings")
 
@@ -82,9 +79,23 @@ if uploaded_file and st.button("Save Metadata", type="primary"):
             """
             session.sql(create_table_sql).collect()
         except Exception as e:
-            st.error(f"❌ Failed to create table: {str(e)}")
-            st.info("💡 Please ensure the database and schema exist, and you have CREATE TABLE privileges.")
-            st.stop()
+            error_msg = str(e)
+            # Check if it's an authentication error
+            if "Authentication token has expired" in error_msg or "390114" in error_msg:
+                st.warning("🔄 Session expired. Reconnecting...")
+                if "get_snowflake_session" in st.session_state:
+                    session = st.session_state.get_snowflake_session()
+                # Retry table creation
+                try:
+                    session.sql(create_table_sql).collect()
+                except Exception as retry_error:
+                    st.error(f"❌ Failed to create table after reconnection: {str(retry_error)}")
+                    st.info("💡 Please ensure the database and schema exist, and you have CREATE TABLE privileges.")
+                    st.stop()
+            else:
+                st.error(f"❌ Failed to create table: {error_msg}")
+                st.info("💡 Please ensure the database and schema exist, and you have CREATE TABLE privileges.")
+                st.stop()
 
         def escape_sql(value: str) -> str:
             return value.replace("'", "''") if value else ""

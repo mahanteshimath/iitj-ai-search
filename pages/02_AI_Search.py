@@ -31,15 +31,12 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Connect to Snowflake and save in session_state
-if "snowflake_session" not in st.session_state:
-    try:
-        st.session_state.snowflake_session = get_active_session()
-    except Exception:
-        from snowflake.snowpark import Session
-        st.session_state.snowflake_session = Session.builder.configs(st.secrets["connections"]["snowflake"]).create()
-
-session = st.session_state.snowflake_session
+# Get Snowflake session from app state (initialized in Home.py)
+if "get_snowflake_session" in st.session_state:
+    session = st.session_state.get_snowflake_session()
+else:
+    st.error("❌ Snowflake session not initialized. Please restart the app.")
+    st.stop()
 
 root = Root(session)
 
