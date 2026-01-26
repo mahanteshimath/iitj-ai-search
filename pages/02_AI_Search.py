@@ -257,7 +257,7 @@ def show_feedback_controls(message_index):
             details = st.text_area("More information (optional)")
 
             if st.checkbox("Include chat history with my feedback", True):
-                relevant_history = st.session_state.messages[:message_index]
+                relevant_history = st.session_state.messages
             else:
                 relevant_history = []
 
