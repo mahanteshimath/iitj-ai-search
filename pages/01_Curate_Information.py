@@ -153,7 +153,7 @@ with st.container(border=True):
     try:
         rows = session.sql(query_sql, params=params).collect()
         data = [r.as_dict() if hasattr(r, "as_dict") else dict(r) for r in rows]
-        st.dataframe(data, use_container_width=True, hide_index=True)
+        st.dataframe(data, width="stretch", hide_index=True)
     except Exception as exc:
         st.error(f"Query failed: {exc}")
 
