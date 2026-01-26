@@ -132,8 +132,8 @@ with title_row:
 
 st.caption("This is a smart way to Search IIT Jodhpur documents uploaded by users")
 
-st.title(":material/compare: Select Models")
-selected_model = st.selectbox("Model", LLM_MODELS, index=1)
+st.sidebar.title("Select Models")
+selected_model = st.sidebar.selectbox("Model", LLM_MODELS, index=1)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -423,13 +423,6 @@ if user_message:
 
 footer="""<style>
 
-button[aria-label="Restart"] {
-position: fixed;
-right: 1.5rem;
-bottom: 1.5rem;
-z-index: 1000;
-}
-
 .footer {
 position: fixed;
 left: 0;
@@ -446,8 +439,11 @@ text-align: center;
 """
 st.markdown(footer, unsafe_allow_html=True)
 
-st.button(
-    "Restart",
-    icon=":material/refresh:",
-    on_click=clear_conversation,
-)
+with st.container():
+    _, right_col = st.columns([8, 1])
+    with right_col:
+        st.button(
+            "Restart",
+            icon=":material/refresh:",
+            on_click=clear_conversation,
+        )
