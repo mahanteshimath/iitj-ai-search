@@ -361,13 +361,6 @@ def clear_conversation():
     st.session_state.initial_question = None
     st.session_state.selected_suggestion = None
 
-with title_row:
-    st.button(
-        "Restart",
-        icon=":material/refresh:",
-        on_click=clear_conversation,
-    )
-
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         if message["role"] == "assistant":
@@ -449,9 +442,27 @@ background-color: #2C1E5B;
 color: white;
 text-align: center;
 }
+
+.restart-btn {
+position: fixed;
+right: 1.5rem;
+bottom: 3rem;
+z-index: 1000;
+}
 </style>
 <div class="footer">
 <p>Developed with ❤️ by <a style='display: inline; text-align: center;' href="https://bit.ly/atozaboutdata" target="_blank">MAHANTESH HIREMATH</a></p>
 </div>
 """
 st.markdown(footer, unsafe_allow_html=True)
+
+with st.container():
+    st.markdown('<div class="restart-btn">', unsafe_allow_html=True)
+    _, _, _, right_col = st.columns([6, 1, 1, 1])
+    with right_col:
+        st.button(
+            "Restart",
+            icon=":material/refresh:",
+            on_click=clear_conversation,
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
