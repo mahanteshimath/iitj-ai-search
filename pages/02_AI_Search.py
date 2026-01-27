@@ -173,6 +173,20 @@ with st.sidebar:
             value="SOURCE_URL,TITLE,UPLOADED_BY,CHUNK_INDEX,CONTENT",
             help="Use column names available in the search service."
         )
+    
+    # Debug section
+    with st.expander("🔍 Debug Info", expanded=False):
+        if "last_search_results" in st.session_state:
+            st.write("**Last Search Results:**")
+            for idx, row in enumerate(st.session_state.last_search_results, start=1):
+                row_dict = row if isinstance(row, dict) else (row.as_dict() if hasattr(row, "as_dict") else dict(row))
+                st.write(f"**Result {idx}:**")
+                st.write(f"- TITLE: {row_dict.get('TITLE', 'N/A')}")
+                st.write(f"- SOURCE_URL: {row_dict.get('SOURCE_URL', 'N/A')}")
+                st.write(f"- UPLOADED_BY: {row_dict.get('UPLOADED_BY', 'N/A')}")
+                st.markdown("---")
+        else:
+            st.write("No search performed yet.")
 
 def parse_columns(raw: str) -> list[str]:
     return [c.strip() for c in raw.split(",") if c.strip()]
@@ -373,17 +387,16 @@ if user_message:
         with st.spinner("Searching documents..."):
             try:
                 results = run_search(user_message)
+                st.session_state.last_search_results = results  # Store for debug
                 search_context = build_search_context(results)
                 
-                # Extract unique source URLs from results (top 3)
+                # Extract all unique source URLs from results
                 source_urls = []
                 for row in results:
                     row_dict = normalize_row(row)
                     url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
                     if url and url not in source_urls:
                         source_urls.append(url)
-                    if len(source_urls) >= 3:
-                        break
             except Exception as exc:
                 search_context = f"Error searching documents: {exc}"
                 source_urls = []
