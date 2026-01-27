@@ -158,7 +158,7 @@ has_message_history = len(st.session_state.messages) > 0
 
 with st.sidebar:
     st.subheader("Search settings")
-    limit = st.slider("Results", min_value=1, max_value=20, value=5)
+    limit = st.slider("Results", min_value=15, max_value=20, value=5)
     if indexed_columns:
         selected_columns = st.multiselect(
             "Columns",
