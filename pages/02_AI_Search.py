@@ -413,9 +413,9 @@ if user_message:
             
             # Append source URLs at the end with descriptive titles
             if source_urls:
-                response += "\n\nTop sources:\n"
+                response += "\n\n**Sources:**\n"
                 for url in source_urls:
-                    response += f"- {url}\n"
+                    response += f"- [{url}]({url})\n"
             
             # Add to chat history
             st.session_state.messages.append({"role": "user", "content": user_message})
