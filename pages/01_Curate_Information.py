@@ -136,7 +136,6 @@ with st.container(border=True):
 
     query_sql = f"""
     SELECT
-        DOC_ID,
         FILE_NAME,
         SHORT_DESCRIPTION,
         SOURCE_URL,
