@@ -414,12 +414,8 @@ if user_message:
             # Append source URLs at the end with descriptive titles
             if source_urls:
                 response += "\n\nTop sources:\n"
-                for idx, url in enumerate(source_urls, start=1):
-                    if "iitj.ac.in" in url.lower():
-                        link_text = "IIT Jodhpur Official Page"
-                    else:
-                        link_text = f"Source Document {idx}"
-                    response += f"- [{link_text}]({url})\n"
+                for url in source_urls:
+                    response += f"- {url}\n"
             
             # Add to chat history
             st.session_state.messages.append({"role": "user", "content": user_message})
