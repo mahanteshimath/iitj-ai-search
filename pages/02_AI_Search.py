@@ -56,7 +56,7 @@ FEEDBACK_TABLE = "IITJ_RAG_FFEDBACK"
 LLM_MODELS = [
     "claude-3-5-sonnet",
     "mistral-7b",
-    "mixtral-8x7b"
+    "mixtral-8x7b",
     "claude-haiku-4-5",
     "openai-gpt-5"
 ]
