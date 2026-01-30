@@ -34,19 +34,52 @@ st.markdown(
 
 # Get Snowflake session from app state (initialized in Home.py)
 def get_or_refresh_session():
-    """Get session and ensure it's valid"""
-    if "get_snowflake_session" not in st.session_state:
-        st.error("❌ Snowflake session not initialized. Please restart the app.")
-        st.stop()
-    
-    # Get a fresh session (will validate or recreate as needed)
-    fresh_session = st.session_state.get_snowflake_session()
-    st.session_state.snowflake_session = fresh_session
-    return fresh_session
+    """Get session and ensure it's valid with fallback logic"""
+    if "get_snowflake_session" in st.session_state:
+        try:
+            session = st.session_state.get_snowflake_session()
+            session.sql("SELECT 1").collect()
+            st.session_state.snowflake_session = session
+            return session
+        except Exception:
+            pass
+
+    if "snowflake_session" in st.session_state:
+        try:
+            st.session_state.snowflake_session.sql("SELECT 1").collect()
+            return st.session_state.snowflake_session
+        except Exception:
+            del st.session_state.snowflake_session
+
+    try:
+        from snowflake.snowpark.context import get_active_session
+        session = get_active_session()
+        session.sql("SELECT 1").collect()
+    except Exception:
+        from snowflake.snowpark import Session
+        connections = st.secrets.get("connections", {})
+        cfg = connections.get("snowflake")
+        if not cfg:
+            st.error("❌ No Snowflake connection configured in secrets.toml")
+            st.stop()
+        session = Session.builder.configs(cfg).create()
+        session.sql("SELECT 1").collect()
+
+    st.session_state.snowflake_session = session
+    return session
 
 session = get_or_refresh_session()
 
 root = Root(session)
+
+# Validate connection
+with st.sidebar:
+    try:
+        version = session.sql("SELECT CURRENT_VERSION()").collect()[0][0]
+        st.success(f"✅ Successfully connected to Database")
+    except Exception as exc:
+        st.error(f"Snowflake connection failed: {exc}")
+        st.stop()
 
 DB = "IITJ"
 SCHEMA = "MH"
