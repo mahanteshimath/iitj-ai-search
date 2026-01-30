@@ -87,11 +87,12 @@ SEARCH_SERVICE = "IITJ_AI_SEARCH"
 HISTORY_LENGTH = 5
 FEEDBACK_TABLE = "IITJ_RAG_FFEDBACK"
 LLM_MODELS = [
-    "claude-3-5-sonnet",
+    "mistral-large2",
+    "llama3.1-70b",
+    "llama3.1-8b",
     "mistral-7b",
     "mixtral-8x7b",
-    "claude-haiku-4-5",
-    "openai-gpt-5"
+    "llama3.2-3b",
 ]
 
 INSTRUCTIONS = textwrap.dedent("""
