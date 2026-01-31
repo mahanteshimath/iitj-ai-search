@@ -297,7 +297,7 @@ def get_response(prompt: str, model: str):
     try:
         # Use SQL-based COMPLETE function for better compatibility
         response = session.sql(
-            "SELECT SNOWFLAKE.CORTEX.COMPLETE(?, ?) as response",
+            "SELECT SNOWFLAKE.CORTEX.AI_COMPLETE(?, ?) as response",
             params=[model, prompt]
         ).collect()
         
