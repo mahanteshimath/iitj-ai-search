@@ -32,40 +32,37 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Get Snowflake session from app state (initialized in Home.py)
+# Snowflake connection (reuse session from Home.py if available)
 def get_or_refresh_session():
-    """Get session and ensure it's valid with fallback logic"""
     if "get_snowflake_session" in st.session_state:
+        session = st.session_state.get_snowflake_session()
         try:
-            session = st.session_state.get_snowflake_session()
             session.sql("SELECT 1").collect()
-            st.session_state.snowflake_session = session
-            return session
         except Exception:
-            pass
+            session = st.session_state.get_snowflake_session()
+        st.session_state.snowflake_session = session
+        return session
 
-    if "snowflake_session" in st.session_state:
+    if "default_session" in st.session_state:
         try:
-            st.session_state.snowflake_session.sql("SELECT 1").collect()
-            return st.session_state.snowflake_session
+            st.session_state.default_session.sql("SELECT 1").collect()
+            return st.session_state.default_session
         except Exception:
-            del st.session_state.snowflake_session
+            del st.session_state.default_session
 
     try:
-        from snowflake.snowpark.context import get_active_session
         session = get_active_session()
         session.sql("SELECT 1").collect()
     except Exception:
         from snowflake.snowpark import Session
         connections = st.secrets.get("connections", {})
-        cfg = connections.get("snowflake")
+        cfg = connections.get("my_example_connection") or connections.get("snowflake")
         if not cfg:
-            st.error("❌ No Snowflake connection configured in secrets.toml")
-            st.stop()
+            raise Exception("No Snowflake connection configured in secrets.toml")
         session = Session.builder.configs(cfg).create()
         session.sql("SELECT 1").collect()
 
-    st.session_state.snowflake_session = session
+    st.session_state.default_session = session
     return session
 
 session = get_or_refresh_session()
