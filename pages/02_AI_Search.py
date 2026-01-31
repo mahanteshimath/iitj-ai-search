@@ -304,11 +304,17 @@ def get_response(prompt: str, model: str):
         )
     except requests.exceptions.HTTPError as exc:
         st.error(
-            "Model request failed. Check if the selected model is available in your Snowflake account."
+            f"HTTP Error: {exc.response.status_code if hasattr(exc, 'response') else 'Unknown'}\n"
+            f"Details: {str(exc)}\n"
+            f"Model: {model}\n"
+            f"Check if the model is available in your Snowflake account."
         )
         st.stop()
+    except requests.exceptions.RequestException as exc:
+        st.error(f"Request failed: {exc}")
+        st.stop()
     except Exception as exc:
-        st.error(f"Model request failed: {exc}")
+        st.error(f"Model request failed: {type(exc).__name__} - {exc}")
         st.stop()
 
 def show_feedback_controls(message_index):
