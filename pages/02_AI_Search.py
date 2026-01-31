@@ -293,37 +293,28 @@ def build_prompt(question: str, search_context: str, recent_history: str = None)
     return "\n\n".join(prompt_parts)
 
 def get_response(prompt: str, model: str):
-    """Get streaming response from LLM."""
+    """Get streaming response from LLM using SQL-based Cortex COMPLETE."""
     try:
-        return complete(
-            model,
-            prompt,
-            stream=True,
-            session=session,
-        )
-    except requests.exceptions.HTTPError as exc:
-        error_msg = f"HTTP Error {exc.response.status_code}: {str(exc)}"
-        if hasattr(exc, 'response') and exc.response is not None:
-            try:
-                error_detail = exc.response.json()
-                error_msg += f"\n\nResponse details: {error_detail}"
-            except:
-                error_msg += f"\n\nResponse text: {exc.response.text[:500]}"
+        # Use SQL-based COMPLETE function for better compatibility
+        response = session.sql(
+            "SELECT SNOWFLAKE.CORTEX.COMPLETE(?, ?) as response",
+            params=[model, prompt]
+        ).collect()
+        
+        if response and len(response) > 0:
+            return response[0]['RESPONSE']
+        else:
+            st.error("No response received from the model.")
+            st.stop()
+            
+    except Exception as exc:
+        error_msg = f"Model request failed: {type(exc).__name__}\n{str(exc)}"
         st.error(
             f"{error_msg}\n\n"
             f"Model: `{model}`\n\n"
             f"💡 Try selecting a different model from the sidebar.\n"
-            f"Common models: mistral-large, llama3-70b, mixtral-8x7b"
-        )
-        st.stop()
-    except requests.exceptions.RequestException as exc:
-        st.error(f"Request failed: {exc}\n\nTry selecting a different model.")
-        st.stop()
-    except Exception as exc:
-        st.error(
-            f"Model request failed: {type(exc).__name__} - {exc}\n\n"
-            f"Model: `{model}`\n\n"
-            f"This might be a session or permissions issue."
+            f"Common models: mistral-large, llama3-70b, mixtral-8x7b\n\n"
+            f"Make sure Cortex AI is enabled in your Snowflake account."
         )
         st.stop()
 
@@ -459,11 +450,11 @@ if user_message:
         
         # Get LLM response
         with st.spinner("Thinking..."):
-            response_gen = get_response(full_prompt, selected_model)
+            response = get_response(full_prompt, selected_model)
         
-        # Stream the response
+        # Display the response
         with st.container():
-            response = st.write_stream(response_gen)
+            st.markdown(response)
             
             # Append source URLs at the end with descriptive titles
             if source_urls:
