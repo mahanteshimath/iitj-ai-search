@@ -84,7 +84,14 @@ SEARCH_SERVICE = "IITJ_AI_SEARCH"
 HISTORY_LENGTH = 5
 FEEDBACK_TABLE = "IITJ_RAG_FFEDBACK"
 LLM_MODELS = [
-    "claude-3-5-sonnet"
+    "mistral-large",
+    "llama3-70b",
+    "llama3-8b",
+    "mixtral-8x7b",
+    "snowflake-arctic",
+    "reka-flash",
+    "mistral-7b",
+    "gemma-7b",
 ]
 
 INSTRUCTIONS = textwrap.dedent("""
@@ -295,18 +302,29 @@ def get_response(prompt: str, model: str):
             session=session,
         )
     except requests.exceptions.HTTPError as exc:
+        error_msg = f"HTTP Error {exc.response.status_code}: {str(exc)}"
+        if hasattr(exc, 'response') and exc.response is not None:
+            try:
+                error_detail = exc.response.json()
+                error_msg += f"\n\nResponse details: {error_detail}"
+            except:
+                error_msg += f"\n\nResponse text: {exc.response.text[:500]}"
         st.error(
-            f"HTTP Error: {exc.response.status_code if hasattr(exc, 'response') else 'Unknown'}\n"
-            f"Details: {str(exc)}\n"
-            f"Model: {model}\n"
-            f"Check if the model is available in your Snowflake account."
+            f"{error_msg}\n\n"
+            f"Model: `{model}`\n\n"
+            f"💡 Try selecting a different model from the sidebar.\n"
+            f"Common models: mistral-large, llama3-70b, mixtral-8x7b"
         )
         st.stop()
     except requests.exceptions.RequestException as exc:
-        st.error(f"Request failed: {exc}")
+        st.error(f"Request failed: {exc}\n\nTry selecting a different model.")
         st.stop()
     except Exception as exc:
-        st.error(f"Model request failed: {type(exc).__name__} - {exc}")
+        st.error(
+            f"Model request failed: {type(exc).__name__} - {exc}\n\n"
+            f"Model: `{model}`\n\n"
+            f"This might be a session or permissions issue."
+        )
         st.stop()
 
 def show_feedback_controls(message_index):
