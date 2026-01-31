@@ -160,7 +160,7 @@ with title_row:
 st.caption("This is a smart way to Search IIT Jodhpur documents uploaded by users")
 
 st.sidebar.title("Select Models")
-selected_model = st.sidebar.selectbox("Model", LLM_MODELS, index=1)
+selected_model = st.sidebar.selectbox("Model", LLM_MODELS, index=0)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
