@@ -202,27 +202,6 @@ with st.sidebar:
             value="SOURCE_URL,TITLE,UPLOADED_BY,CHUNK_INDEX,CONTENT",
             help="Use column names available in the search service."
         )
-    
-    # Debug section
-    with st.expander("🔍 Debug Info", expanded=False):
-        if "last_search_results" in st.session_state:
-            st.write("**Last Search Results:**")
-            for idx, row in enumerate(st.session_state.last_search_results, start=1):
-                # Properly normalize the row data
-                row_dict = normalize_row(row)
-                
-                # Extract and clean the fields
-                title = clean_text(row_dict.get("TITLE")) or row_dict.get("FILE_NAME") or "N/A"
-                source_url = row_dict.get("SOURCE_URL") or row_dict.get("SOURCE") or "N/A"
-                uploaded_by = clean_text(row_dict.get("UPLOADED_BY")) or row_dict.get("UPLOADER") or "N/A"
-                
-                st.write(f"**Result {idx}:**")
-                st.write(f"- TITLE: {title}")
-                st.write(f"- SOURCE_URL: {source_url}")
-                st.write(f"- UPLOADED_BY: {uploaded_by}")
-                st.markdown("---")
-        else:
-            st.write("No search performed yet.")
 
 def parse_columns(raw: str) -> list[str]:
     return [c.strip() for c in raw.split(",") if c.strip()]
