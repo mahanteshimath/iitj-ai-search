@@ -444,16 +444,15 @@ if user_message:
         with st.spinner("Thinking..."):
             response = get_response(full_prompt, selected_model)
         
-        # Display the response
+        # Append source URLs if available
+        if source_urls:
+            response += "\n\n**Sources:**\n"
+            for url in source_urls:
+                response += f"- [{url}]({url})\n"
+        
+        # Display the response and save to history
         with st.container():
             st.markdown(response)
-            
-            # Append source URLs at the end with descriptive titles
-            if source_urls:
-                sources_text = "\n\n**Sources:**\n"
-                for url in source_urls:
-                    sources_text += f"- [{url}]({url})\n"
-                response = response + sources_text
             
             # Add to chat history
             st.session_state.messages.append({"role": "user", "content": user_message})
