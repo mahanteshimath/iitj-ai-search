@@ -485,10 +485,14 @@ if user_message:
         with st.spinner("Thinking..."):
             response = get_response(full_prompt, selected_model)
         
-        # Append source URLs if available (as raw text without formatting)
+        # Append source URLs at the end (always show sources)
         if source_urls:
-            response += "\n\nSource: "
-            response += source_urls[0]  # Keep raw, no markdown formatting
+            response += "\n\n---\n"
+            response += "**Source:** "
+            response += source_urls[0]  # Keep raw URL
+        else:
+            response += "\n\n---\n"
+            response += "**Source:** Not available"
         
         # Display the response and save to history
         with st.container():
