@@ -103,6 +103,35 @@ INSTRUCTIONS = textwrap.dedent("""
     - Don't say things like "according to the provided context" or "based on the search results".
 """)
 
+# Define helper functions early (before they're used in sidebar)
+def parse_columns(raw: str) -> list[str]:
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+def normalize_row(row) -> dict:
+    if isinstance(row, dict):
+        return row
+    if hasattr(row, "as_dict"):
+        return row.as_dict()
+    return dict(row)
+
+def clean_text(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return str(value)
+    # Handle escaped newlines and special characters from API responses
+    text = (
+        value.replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace('\\"', '"')  # Handle escaped quotes
+        .replace("\\'", "'")   # Handle escaped single quotes
+    )
+    # Remove leading/trailing quotes if they wrap the entire response
+    if text.startswith('"') and text.endswith('"'):
+        text = text[1:-1]
+    return text
+
 def get_indexed_columns() -> list[str]:
     try:
         rows = session.sql(
@@ -227,34 +256,6 @@ with st.sidebar:
                 st.text(context[:500] + "...")
             else:
                 st.text(context)
-
-def parse_columns(raw: str) -> list[str]:
-    return [c.strip() for c in raw.split(",") if c.strip()]
-
-def normalize_row(row) -> dict:
-    if isinstance(row, dict):
-        return row
-    if hasattr(row, "as_dict"):
-        return row.as_dict()
-    return dict(row)
-
-def clean_text(value):
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        return str(value)
-    # Handle escaped newlines and special characters from API responses
-    text = (
-        value.replace("\\r\\n", "\n")
-        .replace("\\n", "\n")
-        .replace("\\t", "\t")
-        .replace('\\"', '"')  # Handle escaped quotes
-        .replace("\\'", "'")   # Handle escaped single quotes
-    )
-    # Remove leading/trailing quotes if they wrap the entire response
-    if text.startswith('"') and text.endswith('"'):
-        text = text[1:-1]
-    return text
 
 def build_search_context(results: list[dict]) -> str:
     """Build context string from search results for LLM prompt."""
