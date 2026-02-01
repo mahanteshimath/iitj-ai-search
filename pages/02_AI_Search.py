@@ -241,10 +241,24 @@ with st.sidebar:
             for idx, row in enumerate(results, start=1):
                 row_dict = normalize_row(row)
                 st.write(f"**Chunk {idx}:**")
-                title = row_dict.get("TITLE") or "N/A"
+                
+                # Try multiple field names for title
+                title = row_dict.get("TITLE") or row_dict.get("FILE_NAME") or "N/A"
                 st.write(f"- Title: {title}")
-                source = row_dict.get("SOURCE_URL") or "N/A"
+                
+                # Try multiple field names for source
+                source = row_dict.get("SOURCE_URL") or row_dict.get("SOURCE") or "N/A"
                 st.write(f"- Source: {source}")
+                
+                # Show actual content/chunk
+                content = row_dict.get("CHUNK") or row_dict.get("CONTENT") or row_dict.get("PAGE_CHUNK")
+                if content:
+                    snippet = clean_text(content)
+                    if len(snippet) > 200:
+                        st.text(snippet[:200] + "...")
+                    else:
+                        st.text(snippet)
+                
                 st.markdown("---")
         else:
             st.write("No search performed yet.")
