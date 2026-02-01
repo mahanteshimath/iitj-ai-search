@@ -240,33 +240,34 @@ with st.sidebar:
             
             for idx, row in enumerate(results, start=1):
                 row_dict = normalize_row(row)
-                
-                # Print all available keys for debugging
-                # st.write(f"Available keys: {list(row_dict.keys())}")
-                
                 st.write(f"**Chunk {idx}:**")
                 
-                # File name / Title - try both cases
-                file_name = row_dict.get("FILE_NAME") or row_dict.get("file_name") or row_dict.get("TITLE") or row_dict.get("title") or "N/A"
-                st.write(f"- Title: {file_name}")
+                # TITLE - comes from FILE_NAME alias in Cortex Search Service
+                title = row_dict.get("TITLE") or row_dict.get("title") or "N/A"
+                st.write(f"- Title: {title}")
                 
-                # Source URL - try multiple variations
-                source_url = row_dict.get("SOURCE_URL") or row_dict.get("source_url") or row_dict.get("SOURCE") or row_dict.get("source") or "N/A"
+                # SOURCE_URL - distinct source from UPLOADED_FILES_CHUNKS_TABLE
+                source_url = row_dict.get("SOURCE_URL") or row_dict.get("source_url") or "N/A"
                 st.write(f"- Source: {source_url}")
                 
-                # Show actual chunk content
-                chunk_content = row_dict.get("CHUNK") or row_dict.get("chunk") or row_dict.get("CONTENT") or row_dict.get("content")
-                if chunk_content:
-                    snippet = clean_text(chunk_content)
+                # CHUNK - actual content
+                chunk = row_dict.get("CHUNK") or row_dict.get("chunk")
+                if chunk:
+                    snippet = clean_text(chunk)
                     if len(snippet) > 150:
                         st.text(snippet[:150] + "...")
                     else:
                         st.text(snippet)
                 
-                # Show upload info if available
+                # UPLOADED_BY
                 uploaded_by = row_dict.get("UPLOADED_BY") or row_dict.get("uploaded_by")
                 if uploaded_by:
                     st.write(f"- Uploaded by: {uploaded_by}")
+                
+                # CHUNK_INDEX
+                chunk_index = row_dict.get("CHUNK_INDEX") or row_dict.get("chunk_index")
+                if chunk_index:
+                    st.write(f"- Chunk Index: {chunk_index}")
                 
                 st.markdown("---")
         else:
