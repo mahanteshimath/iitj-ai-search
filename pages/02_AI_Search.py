@@ -199,7 +199,7 @@ with st.sidebar:
         selected_columns = []
         columns = st.text_input(
             "Columns (comma-separated)",
-            value="SOURCE_URL,TITLE,UPLOADED_BY,CHUNK_INDEX,CONTENT",
+            value="CHUNK, SOURCE_URL, TITLE, UPLOAD_TIMESTAMP",
             help="Use column names available in the search service."
         )
 
