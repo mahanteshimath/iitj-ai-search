@@ -208,11 +208,18 @@ with st.sidebar:
         if "last_search_results" in st.session_state:
             st.write("**Last Search Results:**")
             for idx, row in enumerate(st.session_state.last_search_results, start=1):
-                row_dict = row if isinstance(row, dict) else (row.as_dict() if hasattr(row, "as_dict") else dict(row))
+                # Properly normalize the row data
+                row_dict = normalize_row(row)
+                
+                # Extract and clean the fields
+                title = clean_text(row_dict.get("TITLE")) or row_dict.get("FILE_NAME") or "N/A"
+                source_url = row_dict.get("SOURCE_URL") or row_dict.get("SOURCE") or "N/A"
+                uploaded_by = clean_text(row_dict.get("UPLOADED_BY")) or row_dict.get("UPLOADER") or "N/A"
+                
                 st.write(f"**Result {idx}:**")
-                st.write(f"- TITLE: {row_dict.get('TITLE', 'N/A')}")
-                st.write(f"- SOURCE_URL: {row_dict.get('SOURCE_URL', 'N/A')}")
-                st.write(f"- UPLOADED_BY: {row_dict.get('UPLOADED_BY', 'N/A')}")
+                st.write(f"- TITLE: {title}")
+                st.write(f"- SOURCE_URL: {source_url}")
+                st.write(f"- UPLOADED_BY: {uploaded_by}")
                 st.markdown("---")
         else:
             st.write("No search performed yet.")
@@ -254,8 +261,7 @@ def build_search_context(results: list[dict]) -> str:
     for idx, row in enumerate(results, start=1):
         row_dict = normalize_row(row)
         title = clean_text(row_dict.get("TITLE") or row_dict.get("FILE_NAME") or f"Document {idx}")
-        # Keep SOURCE_URL as raw value from database without cleaning
-        source_url = row_dict.get("SOURCE_URL") or row_dict.get("SOURCE")
+        source_url = row_dict.get("SOURCE_URL") # or row_dict.get("SOURCE")
         uploaded_by = clean_text(row_dict.get("UPLOADED_BY") or row_dict.get("UPLOADER"))
         chunk_index = row_dict.get("CHUNK_INDEX")
         snippet = clean_text(
