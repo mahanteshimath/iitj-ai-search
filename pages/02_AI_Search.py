@@ -231,12 +231,19 @@ def clean_text(value):
     if value is None:
         return None
     if not isinstance(value, str):
-        return value
-    return (
+        return str(value)
+    # Handle escaped newlines and special characters from API responses
+    text = (
         value.replace("\\r\\n", "\n")
         .replace("\\n", "\n")
         .replace("\\t", "\t")
+        .replace('\\"', '"')  # Handle escaped quotes
+        .replace("\\'", "'")   # Handle escaped single quotes
     )
+    # Remove leading/trailing quotes if they wrap the entire response
+    if text.startswith('"') and text.endswith('"'):
+        text = text[1:-1]
+    return text
 
 def build_search_context(results: list[dict]) -> str:
     """Build context string from search results for LLM prompt."""
@@ -247,7 +254,8 @@ def build_search_context(results: list[dict]) -> str:
     for idx, row in enumerate(results, start=1):
         row_dict = normalize_row(row)
         title = clean_text(row_dict.get("TITLE") or row_dict.get("FILE_NAME") or f"Document {idx}")
-        source_url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
+        # Keep SOURCE_URL as raw value from database without cleaning
+        source_url = row_dict.get("SOURCE_URL") or row_dict.get("SOURCE")
         uploaded_by = clean_text(row_dict.get("UPLOADED_BY") or row_dict.get("UPLOADER"))
         chunk_index = row_dict.get("CHUNK_INDEX")
         snippet = clean_text(
@@ -298,7 +306,10 @@ def get_response(prompt: str, model: str):
         ).collect()
         
         if response and len(response) > 0:
-            return response[0]['RESPONSE']
+            raw_response = response[0]['RESPONSE']
+            # Clean escape sequences and convert to proper formatting
+            cleaned_response = clean_text(raw_response)
+            return cleaned_response
         else:
             st.error("No response received from the model.")
             st.stop()
@@ -427,11 +438,11 @@ if user_message:
                 st.session_state.last_search_results = results  # Store for debug
                 search_context = build_search_context(results)
                 
-                # Extract all unique source URLs from results
+                # Extract all unique source URLs from results (keep as raw values)
                 source_urls = []
                 for row in results:
                     row_dict = normalize_row(row)
-                    url = clean_text(row_dict.get("SOURCE_URL") or row_dict.get("SOURCE"))
+                    url = row_dict.get("SOURCE_URL") or row_dict.get("SOURCE")
                     if url and url not in source_urls:
                         source_urls.append(url)
             except Exception as exc:
@@ -454,9 +465,10 @@ if user_message:
             
             # Append source URLs at the end with descriptive titles
             if source_urls:
-                response += "\n\n**Sources:**\n"
+                sources_text = "\n\n**Sources:**\n"
                 for url in source_urls:
-                    response += f"- [{url}]({url})\n"
+                    sources_text += f"- [{url}]({url})\n"
+                response = response + sources_text
             
             # Add to chat history
             st.session_state.messages.append({"role": "user", "content": user_message})
