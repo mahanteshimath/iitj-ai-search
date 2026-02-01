@@ -441,10 +441,14 @@ if not user_message:
     if user_just_asked_initial_question:
         user_message = st.session_state.initial_question
     if user_just_clicked_suggestion:
-        user_message = SUGGESTIONS[st.session_state.selected_suggestion]
-
-def clear_conversation():
-    st.session_state.messages = []
+                if t:
+                    t_str = str(t)
+                    if t_str not in distinct_titles:
+                        distinct_titles.append(t_str)
+                if s:
+                    s_str = str(s)
+                    if s_str not in distinct_sources:
+                        distinct_sources.append(s_str)
     st.session_state.initial_question = None
     st.session_state.selected_suggestion = None
 
