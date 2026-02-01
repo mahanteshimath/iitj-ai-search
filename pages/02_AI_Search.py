@@ -202,6 +202,31 @@ with st.sidebar:
             value="CHUNK, SOURCE_URL, TITLE, UPLOAD_TIMESTAMP",
             help="Use column names available in the search service."
         )
+    
+    # Debug section
+    with st.expander("🔍 Debug Info", expanded=False):
+        if "last_search_results" in st.session_state and st.session_state.last_search_results:
+            results = st.session_state.last_search_results
+            st.write(f"**Total Results:** {len(results)} chunks retrieved")
+            
+            for idx, row in enumerate(results, start=1):
+                row_dict = normalize_row(row)
+                st.write(f"**Chunk {idx}:**")
+                title = row_dict.get("TITLE") or "N/A"
+                st.write(f"- Title: {title}")
+                source = row_dict.get("SOURCE_URL") or "N/A"
+                st.write(f"- Source: {source}")
+                st.markdown("---")
+        else:
+            st.write("No search performed yet.")
+        
+        if "last_search_context" in st.session_state:
+            st.write("**Search Context Used:**")
+            context = st.session_state.last_search_context
+            if len(context) > 500:
+                st.text(context[:500] + "...")
+            else:
+                st.text(context)
 
 def parse_columns(raw: str) -> list[str]:
     return [c.strip() for c in raw.split(",") if c.strip()]
@@ -422,6 +447,7 @@ if user_message:
                 results = run_search(user_message)
                 st.session_state.last_search_results = results  # Store for debug
                 search_context = build_search_context(results)
+                st.session_state.last_search_context = search_context  # Store context for debug
                 
                 # Extract all unique source URLs from results (keep as raw values)
                 source_urls = []
