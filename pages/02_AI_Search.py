@@ -276,9 +276,9 @@ with st.sidebar:
         # Display as static list
         st.code(", ".join(selected_columns))
     else:
-        selected_columns = []
-        columns_str = "CHUNK, SOURCE_URL, FILE_NAME, SHORT_DESCRIPTION, UPLOAD_TIMESTAMP"
-        st.code(columns_str)
+        # Fallback if indexed columns not detected
+        selected_columns = ['CHUNK', 'SOURCE_URL', 'FILE_NAME', 'SHORT_DESCRIPTION', 'UPLOAD_TIMESTAMP']
+        st.code(", ".join(selected_columns))
     
     # Debug section removed from here - moved to bottom of page after chat
 
@@ -407,26 +407,19 @@ def run_search(question: str) -> list[dict]:
     cortex_search_service = (
         root.databases[DB].schemas[SCHEMA].cortex_search_services[SEARCH_SERVICE]
     )
-    if indexed_columns:
-        cols = selected_columns or indexed_columns
+    if indexed_columns and selected_columns:
         return cortex_search_service.search(
             question,
-            columns=cols,
+            columns=selected_columns,
             filter={},
             limit=limit,
         ).results
 
-    cols = parse_columns(columns) if "columns" in locals() else []
-    if cols:
-        return cortex_search_service.search(
-            question,
-            columns=cols,
-            filter={},
-            limit=limit,
-        ).results
-
+    # Fallback - use all indexed columns or default essential columns
+    cols = selected_columns if selected_columns else ['CHUNK', 'SOURCE_URL', 'FILE_NAME', 'SHORT_DESCRIPTION']
     return cortex_search_service.search(
         question,
+        columns=cols,
         filter={},
         limit=limit,
     ).results
