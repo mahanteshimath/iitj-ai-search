@@ -23,7 +23,7 @@ if logo_path.exists():
         </style>''',
         unsafe_allow_html=True
     )
-    st.sidebar.image(str(logo_path), use_container_width=True)
+    st.sidebar.image(str(logo_path), width='stretch')
     st.sidebar.markdown("---")
 
 st.markdown(
