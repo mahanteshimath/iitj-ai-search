@@ -14,7 +14,7 @@ if logo_path.exists():
     st.sidebar.markdown("---")
 
 st.title(":material/description: Upload documents to IITJ Smart Search")
-st.caption("Upload any file and store")
+st.caption("Upload any file, store search")
 st.markdown("---")
 
 # Snowflake connection (reuse session from Home.py if available)

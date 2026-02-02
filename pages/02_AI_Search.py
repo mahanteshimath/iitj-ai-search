@@ -73,16 +73,16 @@ root = Root(session)
 with st.sidebar:
     try:
         version = session.sql("SELECT CURRENT_VERSION()").collect()[0][0]
-        st.success(f"✅ Successfully connected to Database")
+        st.success(f"connected to ☁️")
     except Exception as exc:
-        st.error(f"Snowflake connection failed: {exc}")
+        st.error(f"☁️ connection failed: {exc}")
         st.stop()
 
 DB = "IITJ"
 SCHEMA = "MH"
 SEARCH_SERVICE = "IITJ_AI_SEARCH"
 HISTORY_LENGTH = 5
-FEEDBACK_TABLE = "IITJ_RAG_FFEDBACK"
+FEEDBACK_TABLE = "IITJ_RAG_FEEDBACK"
 LLM_MODELS = [
     "claude-3-5-sonnet",
     # "llama3-70b",
