@@ -132,6 +132,20 @@ def clean_text(value):
         text = text[1:-1]
     return text
 
+def get_result_attributes(row_dict: dict) -> dict:
+    attrs = row_dict.get("ATTRIBUTES") or row_dict.get("attributes")
+    return attrs if isinstance(attrs, dict) else {}
+
+def extract_result_text(value):
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        for key in ("content", "text", "CHUNK", "chunk"):
+            if key in value:
+                return extract_result_text(value.get(key))
+        return clean_text(value)
+    return clean_text(value)
+
 def get_indexed_columns() -> list[str]:
     try:
         rows = session.sql(
@@ -234,52 +248,80 @@ with st.sidebar:
     
     # Debug section
     with st.expander("🔍 Debug Info", expanded=False):
-        if "last_search_results" in st.session_state and st.session_state.last_search_results:
-            results = st.session_state.last_search_results
+        last_question = st.session_state.get("last_search_question")
+        if last_question:
+            st.write(f"**Last question:** {last_question}")
+
+        results = st.session_state.get("last_search_results") or []
+        if results:
             st.write(f"**Total Results:** {len(results)} chunks retrieved")
-            
+
+            distinct_titles: list[str] = []
+            distinct_sources: list[str] = []
+            for row in results:
+                row_dict = normalize_row(row)
+                attrs = get_result_attributes(row_dict)
+
+                t_val = attrs.get("TITLE") or attrs.get("title") or row_dict.get("TITLE") or row_dict.get("title")
+                s_val = attrs.get("SOURCE_URL") or attrs.get("source_url") or row_dict.get("SOURCE_URL") or row_dict.get("source_url")
+
+                if t_val:
+                    t_str = str(t_val)
+                    if t_str not in distinct_titles:
+                        distinct_titles.append(t_str)
+                if s_val:
+                    s_str = str(s_val)
+                    if s_str not in distinct_sources:
+                        distinct_sources.append(s_str)
+
+            if distinct_titles:
+                st.write("**Distinct Titles (top 10):**")
+                for t in distinct_titles[:10]:
+                    st.write(f"- {t}")
+            if distinct_sources:
+                st.write("**Distinct SOURCE_URLs (top 10):**")
+                for s in distinct_sources[:10]:
+                    st.write(f"- {s}")
+
+            st.markdown("---")
+
             for idx, row in enumerate(results, start=1):
                 row_dict = normalize_row(row)
+                attrs = get_result_attributes(row_dict)
                 st.write(f"**Chunk {idx}:**")
-                
-                # TITLE - comes from FILE_NAME alias in Cortex Search Service
-                title = row_dict.get("TITLE") or row_dict.get("title") or "N/A"
+
+                title = attrs.get("TITLE") or attrs.get("title") or row_dict.get("TITLE") or row_dict.get("title") or "N/A"
+                source_url = (
+                    attrs.get("SOURCE_URL")
+                    or attrs.get("source_url")
+                    or row_dict.get("SOURCE_URL")
+                    or row_dict.get("source_url")
+                    or "N/A"
+                )
                 st.write(f"- Title: {title}")
-                
-                # SOURCE_URL - distinct source from UPLOADED_FILES_CHUNKS_TABLE
-                source_url = row_dict.get("SOURCE_URL") or row_dict.get("source_url") or "N/A"
                 st.write(f"- Source: {source_url}")
-                
-                # CHUNK - actual content
-                chunk = row_dict.get("CHUNK") or row_dict.get("chunk")
-                if chunk:
-                    snippet = clean_text(chunk)
-                    if len(snippet) > 150:
-                        st.text(snippet[:150] + "...")
-                    else:
-                        st.text(snippet)
-                
-                # UPLOADED_BY
-                uploaded_by = row_dict.get("UPLOADED_BY") or row_dict.get("uploaded_by")
+
+                chunk_value = row_dict.get("CHUNK") or row_dict.get("chunk") or row_dict.get("content")
+                chunk_text = extract_result_text(chunk_value)
+                if chunk_text:
+                    st.text((chunk_text[:250] + "...") if len(chunk_text) > 250 else chunk_text)
+
+                uploaded_by = attrs.get("UPLOADED_BY") or attrs.get("uploaded_by") or row_dict.get("UPLOADED_BY") or row_dict.get("uploaded_by")
                 if uploaded_by:
                     st.write(f"- Uploaded by: {uploaded_by}")
-                
-                # CHUNK_INDEX
-                chunk_index = row_dict.get("CHUNK_INDEX") or row_dict.get("chunk_index")
-                if chunk_index:
+
+                chunk_index = attrs.get("CHUNK_INDEX") or attrs.get("chunk_index") or row_dict.get("CHUNK_INDEX") or row_dict.get("chunk_index")
+                if chunk_index is not None:
                     st.write(f"- Chunk Index: {chunk_index}")
-                
+
                 st.markdown("---")
         else:
             st.write("No search performed yet.")
-        
-        if "last_search_context" in st.session_state:
+
+        context = st.session_state.get("last_search_context")
+        if context:
             st.write("**Search Context Used:**")
-            context = st.session_state.last_search_context
-            if len(context) > 500:
-                st.text(context[:500] + "...")
-            else:
-                st.text(context)
+            st.text((context[:800] + "...") if len(context) > 800 else context)
 
 def build_search_context(results: list[dict]) -> str:
     """Build context string from search results for LLM prompt."""
@@ -289,14 +331,23 @@ def build_search_context(results: list[dict]) -> str:
     context_blocks = []
     for idx, row in enumerate(results, start=1):
         row_dict = normalize_row(row)
-        title = clean_text(row_dict.get("TITLE") or row_dict.get("FILE_NAME") or f"Document {idx}")
-        source_url = row_dict.get("SOURCE_URL") # or row_dict.get("SOURCE")
+        attrs = get_result_attributes(row_dict)
+        title = clean_text(
+            attrs.get("TITLE")
+            or attrs.get("title")
+            or row_dict.get("TITLE")
+            or row_dict.get("title")
+            or row_dict.get("FILE_NAME")
+            or f"Document {idx}"
+        )
+        source_url = attrs.get("SOURCE_URL") or attrs.get("source_url") or row_dict.get("SOURCE_URL") or row_dict.get("source_url")
         uploaded_by = clean_text(row_dict.get("UPLOADED_BY") or row_dict.get("UPLOADER"))
         chunk_index = row_dict.get("CHUNK_INDEX")
-        snippet = clean_text(
+        snippet = extract_result_text(
             row_dict.get("CONTENT")
             or row_dict.get("CHUNK")
             or row_dict.get("PAGE_CHUNK")
+            or row_dict.get("content")
         )
 
         block = f"[Document {idx} - {title}]"
@@ -441,16 +492,20 @@ if not user_message:
     if user_just_asked_initial_question:
         user_message = st.session_state.initial_question
     if user_just_clicked_suggestion:
-                if t:
-                    t_str = str(t)
-                    if t_str not in distinct_titles:
-                        distinct_titles.append(t_str)
-                if s:
-                    s_str = str(s)
-                    if s_str not in distinct_sources:
-                        distinct_sources.append(s_str)
+        user_message = SUGGESTIONS[st.session_state.selected_suggestion]
+
+def clear_conversation():
+    st.session_state.messages = []
     st.session_state.initial_question = None
     st.session_state.selected_suggestion = None
+    for key in (
+        "last_search_results",
+        "last_search_context",
+        "last_search_question",
+        "last_search_error",
+    ):
+        if key in st.session_state:
+            del st.session_state[key]
 
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
@@ -465,6 +520,14 @@ for i, message in enumerate(st.session_state.messages):
 if user_message:
     # Escape LaTeX characters
     user_message = user_message.replace("$", r"\$")
+
+    # Refresh debug info for each new chat question
+    st.session_state.last_search_question = user_message
+    st.session_state.last_search_results = []
+    if "last_search_context" in st.session_state:
+        del st.session_state.last_search_context
+    if "last_search_error" in st.session_state:
+        del st.session_state.last_search_error
     
     with st.chat_message("user"):
         st.text(user_message)
@@ -482,11 +545,19 @@ if user_message:
                 source_urls = []
                 for row in results:
                     row_dict = normalize_row(row)
-                    url = row_dict.get("SOURCE_URL") or row_dict.get("SOURCE")
+                    attrs = get_result_attributes(row_dict)
+                    url = (
+                        attrs.get("SOURCE_URL")
+                        or attrs.get("source_url")
+                        or row_dict.get("SOURCE_URL")
+                        or row_dict.get("source_url")
+                        or row_dict.get("SOURCE")
+                    )
                     if url and url not in source_urls:
                         source_urls.append(url)
             except Exception as exc:
                 search_context = f"Error searching documents: {exc}"
+                st.session_state.last_search_error = str(exc)
                 source_urls = []
         
         # Build prompt with context and history
