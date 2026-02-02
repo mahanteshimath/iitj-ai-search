@@ -48,7 +48,7 @@ if "snowflake_session" not in st.session_state:
         st.session_state.snowflake_session = get_snowflake_session()
         st.session_state.get_snowflake_session = get_snowflake_session
     st.balloons()
-    st.toast("✅ Connected to Snowflake!", icon="✅")
+    st.toast("Connected to ☁️", icon="✅")
 
 # Pages
 curate = st.Page("pages/01_Curate_Information.py", title="Curate Information", icon="📋", default=True)

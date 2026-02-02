@@ -13,8 +13,8 @@ if logo_path.exists():
     st.sidebar.image(str(logo_path), width='stretch')
     st.sidebar.markdown("---")
 
-st.title(":material/description: Document Metadata Uploader")
-st.caption("Upload any file and store metadata in Snowflake")
+st.title(":material/description: Upload documents to IITJ Smart Search")
+st.caption("Upload any file and store")
 st.markdown("---")
 
 # Snowflake connection (reuse session from Home.py if available)
@@ -55,7 +55,7 @@ session = get_or_refresh_session()
 with st.sidebar:
     try:
         version = session.sql("SELECT CURRENT_VERSION()").collect()[0][0]
-        st.success(f"✅ Successfully connected to Database")
+        st.success(f"connected to ☁️")
     except Exception as exc:
         st.error(f"Snowflake connection failed: {exc}")
         st.stop()
@@ -182,7 +182,7 @@ with st.container(border=True):
         st.write(f"**File:** {uploaded_file.name}")
         st.write(f"**Size:** {uploaded_file.size} bytes")
 
-    if st.button(":material/cloud_upload: Upload to Snowflake", type="primary"):
+    if st.button(":material/cloud_upload: Upload to ☁️", type="primary"):
         if not uploaded_file:
             st.error("Please choose a file to upload.")
             st.stop()
@@ -198,7 +198,7 @@ with st.container(border=True):
         file_size = uploaded_file.size
         description = short_description.strip() or file_name
 
-        with st.spinner(":material/upload: Uploading file to Snowflake stage..."):
+        with st.spinner(":material/upload: Uploading files to ☁️..."):
             try:
                 staged_name = file_name
                 file_stream = io.BytesIO(uploaded_file.getvalue())
@@ -212,7 +212,7 @@ with st.container(border=True):
                 st.error(f"Upload failed: {exc}")
                 st.stop()
 
-        with st.spinner(":material/database: Writing metadata..."):
+        with st.spinner(":material/database: Writing metadata to ☁️..."):
             try:
                 insert_sql = f"""
                 INSERT INTO {DATABASE}.{SCHEMA}.{TABLE_NAME}
@@ -236,11 +236,11 @@ with st.container(border=True):
                 st.error(f"Metadata insert failed: {exc}")
                 st.stop()
 
-        with st.spinner("Embeddings getting generated..."):
+        with st.spinner(":material/auto_awesome: Generating embeddings..."):
             try:
                 session.sql(f"LIST {STAGE_NAME}").collect()
                 session.sql(
-                    "CALL GENERATE_EMBEDDINGS_FOR_NEW_FILE(?)",
+                    "CALL IITJ.MH.GENERATE_EMBEDDINGS_FOR_NEW_FILE(?)",
                     params=[file_name],
                 ).collect()
                 st.success(f"Embeddings generated for {file_name}")

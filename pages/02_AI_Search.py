@@ -8,7 +8,7 @@ from snowflake.cortex import complete
 import textwrap
 import requests
 
-st.set_page_config(page_title="IITJ AI Search", page_icon="✨", layout="wide")
+st.set_page_config(page_title="IITJ AI Search", page_icon="🔎", layout="wide")
 
 # Sidebar logo
 logo_path = Path(__file__).parent.parent / "resources" / "iitj.jpg"
@@ -202,7 +202,7 @@ def ensure_feedback_table():
 ensure_feedback_table()
 
 SUGGESTIONS = {
-    ":blue[:material/local_library:] List all faculty": "List all faculty",
+    ":blue[:material/local_library:] List all faculty": "List all faculty IIT Jodhpur along with their research areas",
     ":green[:material/school:] Departments": "Show departments at IIT Jodhpur",
     ":orange[:material/description:] Admission info": "Admission information and deadlines",
     ":violet[:material/science:] Research areas": "Research areas in AI and Data Science",
