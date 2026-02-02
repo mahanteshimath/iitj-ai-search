@@ -223,7 +223,7 @@ with title_row:
         width="stretch",
     )
 
-st.caption("This is a smart way to Search IIT Jodhpur documents uploaded by users")
+st.caption("This is a smart way to Search IITJ Documents using AI")
 
 st.sidebar.title("Select Models")
 selected_model = st.sidebar.selectbox("Model", LLM_MODELS, index=0)

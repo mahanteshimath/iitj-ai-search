@@ -108,7 +108,7 @@ with st.container(border=True):
     with col1:
         name_filter = st.text_input("File name contains", placeholder="e.g., faculty")
     with col2:
-        uploader_filter = st.text_input("Uploaded by", placeholder="e.g., Monty")
+        uploader_filter = st.text_input("Uploaded by", value="m25ai2134@iitj.ac.in")
     with col3:
         url_filter = st.text_input("Source URL contains", placeholder="e.g., iitj.ac.in")
 
@@ -180,7 +180,7 @@ with st.container(border=True):
 
     if uploaded_file:
         st.write(f"**File:** {uploaded_file.name}")
-        st.write(f"**Size:** {uploaded_file.size} bytes")
+        st.write(f"**Size:** {uploaded_file.size / (1024 * 1024):.2f} MB")
 
     if st.button(":material/cloud_upload: Upload to ☁️", type="primary"):
         if not uploaded_file:
@@ -243,7 +243,7 @@ with st.container(border=True):
                     "CALL IITJ.MH.GENERATE_EMBEDDINGS_FOR_NEW_FILE(?)",
                     params=[file_name],
                 ).collect()
-                st.success(f"Embeddings generated for {file_name}")
+                st.success(f"Embeddings generated for {file_name}. You can start searching now!")
             except Exception as exc:
                 st.error(f"Embedding generation failed: {exc}")
 
