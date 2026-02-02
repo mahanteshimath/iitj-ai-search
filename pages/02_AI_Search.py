@@ -572,7 +572,7 @@ if user_message:
 
 
 # Debug Info Section - Placed at bottom so it shows current search results
-st.markdown("---")
+# st.markdown("---")
 with st.sidebar.expander("🔍 Debug Info", expanded=False):
     last_question = st.session_state.get("last_search_question")
     if last_question:
