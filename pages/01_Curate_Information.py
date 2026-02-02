@@ -64,8 +64,24 @@ with st.sidebar:
 DATABASE = "IITJ"
 SCHEMA = "MH"
 TABLE_NAME = "UPLOADED_FILES_METADATA"
+AUTH_TABLE = "IITJ_DOCUMENT_CURATOR_INFO"
 FULL_STAGE_NAME = f"{DATABASE}.{SCHEMA}.IITJ_INFO_STAGE"
 STAGE_NAME = f"@{FULL_STAGE_NAME}"
+
+# Authentication function
+def authenticate_user(email: str, password: str) -> bool:
+    """Verify user credentials against the Snowflake table"""
+    try:
+        auth_query = f"""
+        SELECT COUNT(*) as count
+        FROM {DATABASE}.{SCHEMA}.{AUTH_TABLE}
+        WHERE UER_EMAIL = ? AND PASSWORD = ?
+        """
+        result = session.sql(auth_query, params=[email, password]).collect()
+        return result[0]['COUNT'] > 0
+    except Exception as exc:
+        st.error(f"Authentication error: {exc}")
+        return False
 
 def run_sql_with_refresh(sql: str):
     global session
@@ -158,10 +174,53 @@ with st.container(border=True):
 
 st.markdown("---")
 
+# Authentication Section
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "user_email" not in st.session_state:
+    st.session_state.user_email = ""
+
+# Login/Logout in sidebar
+with st.sidebar:
+    st.markdown("---")
+    if st.session_state.authenticated:
+        st.success(f"🔓 Logged in as: {st.session_state.user_email}")
+        if st.button("🔒 Logout"):
+            st.session_state.authenticated = False
+            st.session_state.user_email = ""
+            st.rerun()
+    else:
+        st.warning("🔒 Login required to upload files")
+
 with st.container(border=True):
     st.subheader(":material/upload: Upload a file")
+    
+    # Show login form if not authenticated
+    if not st.session_state.authenticated:
+        st.info("Please login to upload files")
+        
+        with st.form("login_form"):
+            login_email = st.text_input("Email", placeholder="your.email@iitj.ac.in")
+            login_password = st.text_input("Password", type="password")
+            login_submit = st.form_submit_button("🔓 Login", type="primary")
+            
+            if login_submit:
+                if not login_email.strip() or not login_password.strip():
+                    st.error("Please enter both email and password")
+                else:
+                    if authenticate_user(login_email.strip(), login_password.strip()):
+                        st.session_state.authenticated = True
+                        st.session_state.user_email = login_email.strip()
+                        st.success("Login successful!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid email or password")
+        st.stop()
 
-    uploaded_by = st.text_input("Uploaded by", placeholder="Your name")
+    # Upload form (only shown if authenticated)
+    st.success(f"Logged in as: {st.session_state.user_email}")
+    
+    uploaded_by = st.text_input("Uploaded by", value=st.session_state.user_email, disabled=True)
     short_description = st.text_input(
         "Short description",
         placeholder="Brief description (optional)",
@@ -183,11 +242,11 @@ with st.container(border=True):
         st.write(f"**Size:** {uploaded_file.size / (1024 * 1024):.2f} MB")
 
     if st.button(":material/cloud_upload: Upload to ☁️", type="primary"):
+        if not st.session_state.authenticated:
+            st.error("Please login to upload files.")
+            st.stop()
         if not uploaded_file:
             st.error("Please choose a file to upload.")
-            st.stop()
-        if not uploaded_by.strip():
-            st.error("Please enter who uploaded the file.")
             st.stop()
         if not source_url.strip():
             st.error("Please provide the source URL.")
@@ -228,7 +287,7 @@ with st.container(border=True):
                         source_url.strip(),
                         file_ext,
                         file_size,
-                        uploaded_by.strip(),
+                        st.session_state.user_email,
                     ],
                 ).collect()
                 st.success("File uploaded and metadata saved.")
