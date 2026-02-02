@@ -570,30 +570,6 @@ if user_message:
             # Show feedback
             show_feedback_controls(len(st.session_state.messages) - 1)
 
-footer="""<style>
-
-.footer {
-position: fixed;
-left: 0;
-bottom: 0;
-width: 100%;
-background-color: #2C1E5B;
-color: white;
-text-align: center;
-}
-
-.restart-btn {
-position: fixed;
-right: 1.5rem;
-bottom: 3rem;
-z-index: 1000;
-}
-</style>
-<div class="footer">
-<p>Developed with ❤️ by <a style='display: inline; text-align: center;' href="https://bit.ly/atozaboutdata" target="_blank">MAHANTESH HIREMATH</a></p>
-</div>
-"""
-st.markdown(footer, unsafe_allow_html=True)
 
 # Debug Info Section - Placed at bottom so it shows current search results
 st.markdown("---")
