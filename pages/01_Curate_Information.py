@@ -42,7 +42,7 @@ text-decoration: underline;
 }
 </style>
 <div class="footer">
-<p>Developed with ❤️ by <a style='display: inline; text-align: center;' href="https://bit.ly/atozaboutdata" target="_blank">MAHANTESH HIREMATH</a></p>
+<p>Developed with ❤️ by <a style='display: inline; text-align: center;' href="https://bit.ly/atozaboutdata" target="_blank">MAHANTESH HIREMATH(M25AI2134@IITJ.AC.IN)</a></p>
 </div>
 """
 st.markdown(footer, unsafe_allow_html=True)
