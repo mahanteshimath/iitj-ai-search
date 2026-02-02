@@ -266,7 +266,7 @@ with st.sidebar:
     limit = st.slider("Results", min_value=15, max_value=20, value=15)
     
     # Display columns as static info (not editable)
-    st.write("**Columns:**")
+    # st.write("**Columns:**")
     if indexed_columns:
         essential_cols = ['CHUNK', 'SOURCE_URL', 'FILE_NAME', 'SHORT_DESCRIPTION']
         selected_columns = [col for col in essential_cols if col in indexed_columns]
@@ -274,11 +274,11 @@ with st.sidebar:
             selected_columns = indexed_columns
         
         # Display as static list
-        st.code(", ".join(selected_columns))
+        # st.code(", ".join(selected_columns))
     else:
         # Fallback if indexed columns not detected
         selected_columns = ['CHUNK', 'SOURCE_URL', 'FILE_NAME', 'SHORT_DESCRIPTION', 'UPLOAD_TIMESTAMP']
-        st.code(", ".join(selected_columns))
+        # st.code(", ".join(selected_columns))
     
     # Debug section removed from here - moved to bottom of page after chat
 
