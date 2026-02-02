@@ -10,10 +10,20 @@ import requests
 
 st.set_page_config(page_title="IITJ AI Search", page_icon="🔎", layout="wide")
 
-# Sidebar logo
+# Sidebar logo - responsive to sidebar width
 logo_path = Path(__file__).parent.parent / "resources" / "iitj.jpg"
 if logo_path.exists():
-    st.sidebar.image(str(logo_path), width=180)
+    st.sidebar.markdown(
+        f'''<style>
+        .sidebar .element-container img {{
+            width: 100% !important;
+            max-width: 250px;
+            height: auto;
+        }}
+        </style>''',
+        unsafe_allow_html=True
+    )
+    st.sidebar.image(str(logo_path), use_container_width=True)
     st.sidebar.markdown("---")
 
 st.markdown(
