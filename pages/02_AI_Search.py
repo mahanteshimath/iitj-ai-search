@@ -13,7 +13,7 @@ st.set_page_config(page_title="IITJ AI Search", page_icon="🔎", layout="wide")
 # Sidebar logo
 logo_path = Path(__file__).parent.parent / "resources" / "iitj.jpg"
 if logo_path.exists():
-    st.sidebar.image(str(logo_path), width='stretch')
+    st.sidebar.image(str(logo_path), width=180)
     st.sidebar.markdown("---")
 
 st.markdown(

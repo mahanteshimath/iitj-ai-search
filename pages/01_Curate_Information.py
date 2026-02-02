@@ -10,11 +10,43 @@ st.set_page_config(page_title="Curate Information", page_icon="📋", layout="wi
 # Sidebar logo
 logo_path = Path(__file__).parent.parent / "resources" / "iitj.jpg"
 if logo_path.exists():
-    st.sidebar.image(str(logo_path), width='stretch')
+    st.sidebar.image(str(logo_path), width=180)
     st.sidebar.markdown("---")
 
 st.title(":material/description: Upload documents to IITJ Smart Search")
 st.caption("Upload any file, store and search")
+
+# Footer - placed early to ensure it always renders
+footer = """<style>
+.footer {
+position: fixed;
+left: 0;
+bottom: 0;
+width: 100%;
+background-color: #2C1E5B;
+color: white;
+text-align: center;
+z-index: 9999;
+padding: 10px 0;
+box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+.footer p {
+margin: 0;
+}
+.footer a {
+color: white;
+text-decoration: none;
+}
+.footer a:hover {
+text-decoration: underline;
+}
+</style>
+<div class="footer">
+<p>Developed with ❤️ by <a style='display: inline; text-align: center;' href="https://bit.ly/atozaboutdata" target="_blank">MAHANTESH HIREMATH</a></p>
+</div>
+"""
+st.markdown(footer, unsafe_allow_html=True)
+
 st.markdown("---")
 
 # Snowflake connection (reuse session from Home.py if available)
@@ -305,21 +337,3 @@ with st.container(border=True):
                 st.success(f"Embeddings generated for {file_name}. You can start searching now!")
             except Exception as exc:
                 st.error(f"Embedding generation failed: {exc}")
-
-
-footer = """<style>
-.footer {
-position: fixed;
-left: 0;
-bottom: 0;
-width: 100%;
-background-color: #2C1E5B;
-color: white;
-text-align: center;
-}
-</style>
-<div class="footer">
-<p>Developed with ❤️ by <a style='display: inline; text-align: center;' href="https://bit.ly/atozaboutdata" target="_blank">MAHANTESH HIREMATH</a></p>
-</div>
-"""
-st.markdown(footer, unsafe_allow_html=True)
