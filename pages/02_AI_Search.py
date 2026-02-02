@@ -99,7 +99,7 @@ INSTRUCTIONS = textwrap.dedent("""
     - Be brief but clear and informative.
     - Provide specific details from the search results.
     - If the search results don't contain relevant information, say so clearly.
-    - Include source links at the end when available.
+    - DO NOT include source links or URLs in your response - they will be added automatically.
     - Don't say things like "according to the provided context" or "based on the search results".
 """)
 
@@ -156,11 +156,34 @@ def get_indexed_columns() -> list[str]:
 
     for row in rows:
         row_dict = row.as_dict() if hasattr(row, "as_dict") else dict(row)
-        name = (row_dict.get("name") or row_dict.get("NAME") or "").lower()
-        if name in {"columns", "search_columns", "indexed_columns"}:
-            value = row_dict.get("value") or row_dict.get("VALUE") or ""
-            return [c.strip() for c in value.split(",") if c.strip()]
-    return []
+        # Check various possible column name variations
+        name_key = None
+        for key in ["name", "NAME", "Name"]:
+            if key in row_dict:
+                name_key = key
+                break
+        
+        if not name_key:
+            continue
+            
+        name = (row_dict.get(name_key) or "").lower()
+        if name in {"columns", "search_columns", "indexed_columns", "search columns"}:
+            # Try different value key variations
+            value = None
+            for key in ["value", "VALUE", "Value"]:
+                value = row_dict.get(key)
+                if value:
+                    break
+            
+            if value:
+                cols = [c.strip() for c in str(value).split(",") if c.strip()]
+                # Ensure CHUNK is included as it's the search column
+                if "CHUNK" not in cols:
+                    cols.insert(0, "CHUNK")
+                return cols
+    
+    # Fallback to hardcoded columns if parsing fails
+    return ["CHUNK", "SOURCE_URL", "FILE_NAME", "SHORT_DESCRIPTION", "UPLOAD_TIMESTAMP", "UPLOADED_BY", "CHUNK_INDEX"]
 
 indexed_columns = get_indexed_columns()
 
@@ -232,17 +255,24 @@ with st.sidebar:
     st.subheader("Search settings")
     limit = st.slider("Results", min_value=15, max_value=20, value=15)
     if indexed_columns:
+        # Ensure we request essential columns for source attribution
+        essential_cols = ['CHUNK', 'SOURCE_URL', 'FILE_NAME', 'SHORT_DESCRIPTION']
+        default_cols = [col for col in essential_cols if col in indexed_columns]
+        if len(default_cols) < len(essential_cols):
+            # If some essential columns are missing, just use all indexed columns
+            default_cols = indexed_columns
+        
         selected_columns = st.multiselect(
             "Columns",
             options=indexed_columns,
-            default=indexed_columns[:3],
+            default=default_cols,
             help="These are the indexed columns for this search service."
         )
     else:
         selected_columns = []
         columns = st.text_input(
             "Columns (comma-separated)",
-            value="CHUNK, SOURCE_URL, TITLE, UPLOAD_TIMESTAMP",
+            value="CHUNK, SOURCE_URL, FILE_NAME, SHORT_DESCRIPTION, UPLOAD_TIMESTAMP",
             help="Use column names available in the search service."
         )
     
@@ -357,8 +387,7 @@ def build_search_context(results: list[dict]) -> str:
             block += f"\nChunk index: {chunk_index}"
         if snippet:
             block += f"\n{snippet}"
-        if source_url:
-            block += f"\nSource: {source_url}"
+        # Don't include source_url in context - we append it separately to avoid duplication
 
         context_blocks.append(block)
 
@@ -541,24 +570,58 @@ if user_message:
                 search_context = build_search_context(results)
                 st.session_state.last_search_context = search_context  # Store context for debug
                 
-                # Extract all unique source URLs from results (keep as raw values)
-                source_urls = []
+                # Extract all unique sources with their metadata (not controlled by LLM)
+                # Cortex Search returns results with CHUNK at top level and metadata in attributes
+                source_documents = []
+                seen_urls = set()
+                
                 for row in results:
                     row_dict = normalize_row(row)
+                    
+                    # Try to get attributes object first
                     attrs = get_result_attributes(row_dict)
-                    url = (
-                        attrs.get("SOURCE_URL")
-                        or attrs.get("source_url")
-                        or row_dict.get("SOURCE_URL")
-                        or row_dict.get("source_url")
-                        or row_dict.get("SOURCE")
-                    )
-                    if url and url not in source_urls:
-                        source_urls.append(url)
+                    
+                    # Extract URL - check both attributes and top-level keys
+                    url = None
+                    for key in ["SOURCE_URL", "source_url", "SOURCE", "source"]:
+                        url = attrs.get(key) or row_dict.get(key)
+                        if url:
+                            break
+                    
+                    # Skip if no URL or already seen
+                    if not url or url in seen_urls:
+                        continue
+                    
+                    seen_urls.add(url)
+                    
+                    # Extract document title - try multiple sources
+                    title = None
+                    # First try attributes
+                    for key in ["TITLE", "title", "FILE_NAME", "file_name", "SHORT_DESCRIPTION", "short_description"]:
+                        title = attrs.get(key)
+                        if title:
+                            break
+                    
+                    # If not found in attributes, try top-level
+                    if not title:
+                        for key in ["TITLE", "title", "FILE_NAME", "file_name", "SHORT_DESCRIPTION", "short_description"]:
+                            title = row_dict.get(key)
+                            if title:
+                                break
+                    
+                    # Default fallback
+                    if not title:
+                        title = "Document"
+                    
+                    source_documents.append({
+                        "title": clean_text(title) if title else "Document",
+                        "url": str(url)
+                    })
+                    
             except Exception as exc:
                 search_context = f"Error searching documents: {exc}"
                 st.session_state.last_search_error = str(exc)
-                source_urls = []
+                source_documents = []
         
         # Build prompt with context and history
         recent_history = st.session_state.messages[-HISTORY_LENGTH:] if len(st.session_state.messages) > 0 else []
@@ -570,14 +633,19 @@ if user_message:
         with st.spinner("Thinking..."):
             response = get_response(full_prompt, selected_model)
         
-        # Append source URLs at the end (always show sources)
-        if source_urls:
+        # Append source documents at the end (extracted from search results, NOT from LLM)
+        if source_documents:
             response += "\n\n---\n"
-            response += "**Source:** "
-            response += source_urls[0]  # Keep raw URL
+            if len(source_documents) == 1:
+                response += "**Source:**\n"
+            else:
+                response += f"**Sources ({len(source_documents)} documents):**\n"
+            
+            for doc in source_documents:
+                response += f"• {doc['title']} - {doc['url']}\n"
         else:
             response += "\n\n---\n"
-            response += "**Source:** Not available"
+            response += "**Source:** No source documents found"
         
         # Display the response and save to history
         with st.container():
