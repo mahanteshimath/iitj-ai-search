@@ -263,7 +263,7 @@ has_message_history = len(st.session_state.messages) > 0
 
 with st.sidebar:
     st.subheader("Search settings")
-    limit = st.slider("Results", min_value=15, max_value=20, value=15)
+    limit = st.slider("Results", min_value=10, max_value=20, value=10, step=1, help="Maximum number of search results to retrieve")
     
     # Display columns as static info (not editable)
     # st.write("**Columns:**")
