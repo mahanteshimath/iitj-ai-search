@@ -204,7 +204,7 @@ ensure_feedback_table()
 SUGGESTIONS = {
     ":blue[:material/local_library:] List all faculty": "List all faculty IIT Jodhpur along with their research areas",
     ":green[:material/school:] Departments": "Show departments at IIT Jodhpur",
-    ":orange[:material/description:] Admission info": "Admission information and deadlines",
+    ":orange[:material/description:] Professor who working in AI/DATA SCIENCE": "List all professors who expertise in AI/DATA SCIENCE and departments related to AI",
     ":violet[:material/science:] Research areas": "Research areas in AI and Data Science",
     ":red[:material/contacts:] Contact details": "Contact details for IIT Jodhpur",
 }
