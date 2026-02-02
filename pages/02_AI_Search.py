@@ -85,7 +85,7 @@ HISTORY_LENGTH = 5
 FEEDBACK_TABLE = "IITJ_RAG_FFEDBACK"
 LLM_MODELS = [
     "claude-3-5-sonnet",
-    "llama3-70b",
+    # "llama3-70b",
     "claude-4-sonnet"
 ]
 
@@ -237,6 +237,16 @@ if "initial_question" not in st.session_state:
 if "selected_suggestion" not in st.session_state:
     st.session_state.selected_suggestion = None
 
+# Initialize debug info state variables
+if "last_search_results" not in st.session_state:
+    st.session_state.last_search_results = []
+if "last_search_context" not in st.session_state:
+    st.session_state.last_search_context = None
+if "last_search_question" not in st.session_state:
+    st.session_state.last_search_question = None
+if "last_search_error" not in st.session_state:
+    st.session_state.last_search_error = None
+
 user_just_asked_initial_question = (
     "initial_question" in st.session_state and st.session_state.initial_question
 )
@@ -254,104 +264,23 @@ has_message_history = len(st.session_state.messages) > 0
 with st.sidebar:
     st.subheader("Search settings")
     limit = st.slider("Results", min_value=15, max_value=20, value=15)
+    
+    # Display columns as static info (not editable)
+    st.write("**Columns:**")
     if indexed_columns:
-        # Ensure we request essential columns for source attribution
         essential_cols = ['CHUNK', 'SOURCE_URL', 'FILE_NAME', 'SHORT_DESCRIPTION']
-        default_cols = [col for col in essential_cols if col in indexed_columns]
-        if len(default_cols) < len(essential_cols):
-            # If some essential columns are missing, just use all indexed columns
-            default_cols = indexed_columns
+        selected_columns = [col for col in essential_cols if col in indexed_columns]
+        if len(selected_columns) < len(essential_cols):
+            selected_columns = indexed_columns
         
-        selected_columns = st.multiselect(
-            "Columns",
-            options=indexed_columns,
-            default=default_cols,
-            help="These are the indexed columns for this search service."
-        )
+        # Display as static list
+        st.code(", ".join(selected_columns))
     else:
         selected_columns = []
-        columns = st.text_input(
-            "Columns (comma-separated)",
-            value="CHUNK, SOURCE_URL, FILE_NAME, SHORT_DESCRIPTION, UPLOAD_TIMESTAMP",
-            help="Use column names available in the search service."
-        )
+        columns_str = "CHUNK, SOURCE_URL, FILE_NAME, SHORT_DESCRIPTION, UPLOAD_TIMESTAMP"
+        st.code(columns_str)
     
-    # Debug section
-    with st.expander("🔍 Debug Info", expanded=False):
-        last_question = st.session_state.get("last_search_question")
-        if last_question:
-            st.write(f"**Last question:** {last_question}")
-
-        results = st.session_state.get("last_search_results") or []
-        if results:
-            st.write(f"**Total Results:** {len(results)} chunks retrieved")
-
-            distinct_titles: list[str] = []
-            distinct_sources: list[str] = []
-            for row in results:
-                row_dict = normalize_row(row)
-                attrs = get_result_attributes(row_dict)
-
-                t_val = attrs.get("TITLE") or attrs.get("title") or row_dict.get("TITLE") or row_dict.get("title")
-                s_val = attrs.get("SOURCE_URL") or attrs.get("source_url") or row_dict.get("SOURCE_URL") or row_dict.get("source_url")
-
-                if t_val:
-                    t_str = str(t_val)
-                    if t_str not in distinct_titles:
-                        distinct_titles.append(t_str)
-                if s_val:
-                    s_str = str(s_val)
-                    if s_str not in distinct_sources:
-                        distinct_sources.append(s_str)
-
-            if distinct_titles:
-                st.write("**Distinct Titles (top 10):**")
-                for t in distinct_titles[:10]:
-                    st.write(f"- {t}")
-            if distinct_sources:
-                st.write("**Distinct SOURCE_URLs (top 10):**")
-                for s in distinct_sources[:10]:
-                    st.write(f"- {s}")
-
-            st.markdown("---")
-
-            for idx, row in enumerate(results, start=1):
-                row_dict = normalize_row(row)
-                attrs = get_result_attributes(row_dict)
-                st.write(f"**Chunk {idx}:**")
-
-                title = attrs.get("TITLE") or attrs.get("title") or row_dict.get("TITLE") or row_dict.get("title") or "N/A"
-                source_url = (
-                    attrs.get("SOURCE_URL")
-                    or attrs.get("source_url")
-                    or row_dict.get("SOURCE_URL")
-                    or row_dict.get("source_url")
-                    or "N/A"
-                )
-                st.write(f"- Title: {title}")
-                st.write(f"- Source: {source_url}")
-
-                chunk_value = row_dict.get("CHUNK") or row_dict.get("chunk") or row_dict.get("content")
-                chunk_text = extract_result_text(chunk_value)
-                if chunk_text:
-                    st.text((chunk_text[:250] + "...") if len(chunk_text) > 250 else chunk_text)
-
-                uploaded_by = attrs.get("UPLOADED_BY") or attrs.get("uploaded_by") or row_dict.get("UPLOADED_BY") or row_dict.get("uploaded_by")
-                if uploaded_by:
-                    st.write(f"- Uploaded by: {uploaded_by}")
-
-                chunk_index = attrs.get("CHUNK_INDEX") or attrs.get("chunk_index") or row_dict.get("CHUNK_INDEX") or row_dict.get("chunk_index")
-                if chunk_index is not None:
-                    st.write(f"- Chunk Index: {chunk_index}")
-
-                st.markdown("---")
-        else:
-            st.write("No search performed yet.")
-
-        context = st.session_state.get("last_search_context")
-        if context:
-            st.write("**Search Context Used:**")
-            st.text((context[:800] + "...") if len(context) > 800 else context)
+    # Debug section removed from here - moved to bottom of page after chat
 
 def build_search_context(results: list[dict]) -> str:
     """Build context string from search results for LLM prompt."""
@@ -527,14 +456,11 @@ def clear_conversation():
     st.session_state.messages = []
     st.session_state.initial_question = None
     st.session_state.selected_suggestion = None
-    for key in (
-        "last_search_results",
-        "last_search_context",
-        "last_search_question",
-        "last_search_error",
-    ):
-        if key in st.session_state:
-            del st.session_state[key]
+    # Clear debug info when conversation is restarted
+    st.session_state.last_search_results = []
+    st.session_state.last_search_context = None
+    st.session_state.last_search_question = None
+    st.session_state.last_search_error = None
 
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
@@ -550,13 +476,9 @@ if user_message:
     # Escape LaTeX characters
     user_message = user_message.replace("$", r"\$")
 
-    # Refresh debug info for each new chat question
+    # Store debug info for current question (don't delete, just update)
     st.session_state.last_search_question = user_message
-    st.session_state.last_search_results = []
-    if "last_search_context" in st.session_state:
-        del st.session_state.last_search_context
-    if "last_search_error" in st.session_state:
-        del st.session_state.last_search_error
+    # Don't clear results here - they'll be updated after search completes
     
     with st.chat_message("user"):
         st.text(user_message)
@@ -565,28 +487,33 @@ if user_message:
         # Search for relevant context
         with st.spinner("Searching documents..."):
             try:
-                results = run_search(user_message)
-                st.session_state.last_search_results = results  # Store for debug
+                search_result = run_search(user_message)
+                # Convert to list if needed and store IMMEDIATELY
+                if search_result:
+                    results = list(search_result) if not isinstance(search_result, list) else search_result
+                else:
+                    results = []
+                
+                # Store results for debug panel (must happen before any processing)
+                st.session_state.last_search_results = results
+                st.session_state.last_search_error = None
+                
                 search_context = build_search_context(results)
                 st.session_state.last_search_context = search_context  # Store context for debug
                 
                 # Extract all unique sources with their metadata (not controlled by LLM)
-                # Cortex Search returns results with CHUNK at top level and metadata in attributes
+                # Cortex Search returns results with fields at TOP LEVEL (not in attributes)
                 source_documents = []
                 seen_urls = set()
                 
                 for row in results:
                     row_dict = normalize_row(row)
                     
-                    # Try to get attributes object first
-                    attrs = get_result_attributes(row_dict)
-                    
-                    # Extract URL - check both attributes and top-level keys
-                    url = None
-                    for key in ["SOURCE_URL", "source_url", "SOURCE", "source"]:
-                        url = attrs.get(key) or row_dict.get(key)
-                        if url:
-                            break
+                    # Extract URL - check TOP LEVEL FIRST (this is where Snowflake puts it)
+                    url = (
+                        row_dict.get("SOURCE_URL") 
+                        or row_dict.get("source_url")
+                    )
                     
                     # Skip if no URL or already seen
                     if not url or url in seen_urls:
@@ -594,24 +521,14 @@ if user_message:
                     
                     seen_urls.add(url)
                     
-                    # Extract document title - try multiple sources
-                    title = None
-                    # First try attributes
-                    for key in ["TITLE", "title", "FILE_NAME", "file_name", "SHORT_DESCRIPTION", "short_description"]:
-                        title = attrs.get(key)
-                        if title:
-                            break
-                    
-                    # If not found in attributes, try top-level
-                    if not title:
-                        for key in ["TITLE", "title", "FILE_NAME", "file_name", "SHORT_DESCRIPTION", "short_description"]:
-                            title = row_dict.get(key)
-                            if title:
-                                break
-                    
-                    # Default fallback
-                    if not title:
-                        title = "Document"
+                    # Extract document title - check TOP LEVEL FIRST
+                    title = (
+                        row_dict.get("SHORT_DESCRIPTION")
+                        or row_dict.get("short_description")
+                        or row_dict.get("FILE_NAME")
+                        or row_dict.get("file_name")
+                        or "Document"
+                    )
                     
                     source_documents.append({
                         "title": clean_text(title) if title else "Document",
@@ -635,17 +552,19 @@ if user_message:
         
         # Append source documents at the end (extracted from search results, NOT from LLM)
         if source_documents:
-            response += "\n\n---\n"
+            response += "\n\n---\n\n"
             if len(source_documents) == 1:
-                response += "**Source:**\n"
+                response += "### 📚 Source\n\n"
             else:
-                response += f"**Sources ({len(source_documents)} documents):**\n"
+                response += f"### 📚 Sources ({len(source_documents)} documents)\n\n"
             
-            for doc in source_documents:
-                response += f"• {doc['title']} - {doc['url']}\n"
+            for idx, doc in enumerate(source_documents, 1):
+                response += f"{idx}. **{doc['title']}**  \n"
+                response += f"   🔗 [{doc['url']}]({doc['url']})\n\n"
         else:
-            response += "\n\n---\n"
-            response += "**Source:** No source documents found"
+            response += "\n\n---\n\n"
+            response += "### 📚 Source\n\n"
+            response += "*No source documents found*"
         
         # Display the response and save to history
         with st.container():
@@ -682,6 +601,91 @@ z-index: 1000;
 </div>
 """
 st.markdown(footer, unsafe_allow_html=True)
+
+# Debug Info Section - Placed at bottom so it shows current search results
+st.markdown("---")
+with st.expander("🔍 Debug Info", expanded=False):
+    last_question = st.session_state.get("last_search_question")
+    if last_question:
+        st.write(f"**Last question:** {last_question}")
+
+    results = st.session_state.get("last_search_results") or []
+    if results:
+        st.write(f"**Total Results:** {len(results)} chunks retrieved")
+
+        distinct_titles: list[str] = []
+        distinct_sources: list[str] = []
+        for row in results:
+            row_dict = normalize_row(row)
+
+            # Use SHORT_DESCRIPTION or FILE_NAME for title
+            t_val = (
+                row_dict.get("SHORT_DESCRIPTION") or row_dict.get("short_description")
+                or row_dict.get("FILE_NAME") or row_dict.get("file_name")
+            )
+            s_val = (
+                row_dict.get("SOURCE_URL") or row_dict.get("source_url")
+            )
+
+            if t_val:
+                t_str = str(t_val)
+                if t_str not in distinct_titles:
+                    distinct_titles.append(t_str)
+            if s_val:
+                s_str = str(s_val)
+                if s_str not in distinct_sources:
+                    distinct_sources.append(s_str)
+
+        if distinct_titles:
+            st.write("**Distinct Titles (top 10):**")
+            for t in distinct_titles[:10]:
+                st.write(f"- {t}")
+        if distinct_sources:
+            st.write("**Distinct SOURCE_URLs (top 10):**")
+            for s in distinct_sources[:10]:
+                st.write(f"- {s}")
+
+        st.markdown("---")
+
+        for idx, row in enumerate(results, start=1):
+            row_dict = normalize_row(row)
+            st.write(f"**Chunk {idx}:**")
+
+            # Use SHORT_DESCRIPTION or FILE_NAME for title
+            title = (
+                row_dict.get("SHORT_DESCRIPTION") or row_dict.get("short_description")
+                or row_dict.get("FILE_NAME") or row_dict.get("file_name")
+                or "N/A"
+            )
+            source_url = (
+                row_dict.get("SOURCE_URL")
+                or row_dict.get("source_url")
+                or "N/A"
+            )
+            st.write(f"- Title: {title}")
+            st.write(f"- Source: {source_url}")
+
+            chunk_value = row_dict.get("CHUNK") or row_dict.get("chunk") or row_dict.get("content")
+            chunk_text = extract_result_text(chunk_value)
+            if chunk_text:
+                st.text((chunk_text[:250] + "...") if len(chunk_text) > 250 else chunk_text)
+
+            uploaded_by = row_dict.get("UPLOADED_BY") or row_dict.get("uploaded_by")
+            if uploaded_by:
+                st.write(f"- Uploaded by: {uploaded_by}")
+
+            chunk_index = row_dict.get("CHUNK_INDEX") or row_dict.get("chunk_index")
+            if chunk_index is not None:
+                st.write(f"- Chunk Index: {chunk_index}")
+
+            st.markdown("---")
+    else:
+        st.write("No search performed yet.")
+
+    context = st.session_state.get("last_search_context")
+    if context:
+        st.write("**Search Context Used:**")
+        st.text((context[:800] + "...") if len(context) > 800 else context)
 
 with st.container():
     st.markdown('<div class="restart-btn">', unsafe_allow_html=True)
