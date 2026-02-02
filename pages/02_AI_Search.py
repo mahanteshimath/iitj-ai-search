@@ -7,6 +7,13 @@ from snowflake.core import Root
 from snowflake.cortex import complete
 import textwrap
 import requests
+from io import BytesIO
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from datetime import datetime
 
 st.set_page_config(page_title="IITJ AI Search", page_icon="🔎", layout="wide")
 
@@ -233,7 +240,7 @@ with title_row:
         width="stretch",
     )
 
-st.caption("This is a smart way to Search IITJ Documents using AI")
+st.caption("This is a smart way to Search information about IITJ using AI")
 
 # Footer - placed early to ensure it always renders
 footer = """<style>
@@ -496,6 +503,80 @@ def clear_conversation():
     st.session_state.last_search_question = None
     st.session_state.last_search_error = None
 
+def generate_chat_pdf() -> BytesIO:
+    """Generate PDF from chat history."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=72, leftMargin=72,
+                            topMargin=72, bottomMargin=18)
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    
+    # Define styles
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='ChatUser',
+                              parent=styles['Normal'],
+                              fontSize=10,
+                              textColor='blue',
+                              spaceAfter=6,
+                              leftIndent=0))
+    styles.add(ParagraphStyle(name='ChatAssistant',
+                              parent=styles['Normal'],
+                              fontSize=10,
+                              textColor='green',
+                              spaceAfter=6,
+                              leftIndent=0))
+    styles.add(ParagraphStyle(name='ChatContent',
+                              parent=styles['Normal'],
+                              fontSize=9,
+                              spaceAfter=12,
+                              leftIndent=20))
+    
+    # Add title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor='darkblue',
+        spaceAfter=30,
+        alignment=TA_CENTER
+    )
+    elements.append(Paragraph("IITJ AI Search - Chat History", title_style))
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Add chat messages
+    for i, message in enumerate(st.session_state.messages, 1):
+        role = message['role']
+        content = message['content']
+        
+        # Clean content for PDF (remove markdown symbols that might cause issues)
+        # Keep it simple - just escape XML special characters
+        content = content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        content = content.replace('\n', '<br/>')
+        
+        if role == 'user':
+            elements.append(Paragraph(f"<b>User (Question {i//2 + 1}):</b>", styles['ChatUser']))
+            elements.append(Paragraph(content, styles['ChatContent']))
+        else:
+            elements.append(Paragraph(f"<b>Assistant:</b>", styles['ChatAssistant']))
+            # Split long responses into chunks to avoid reportlab issues
+            max_chunk = 3000
+            if len(content) > max_chunk:
+                chunks = [content[i:i+max_chunk] for i in range(0, len(content), max_chunk)]
+                for chunk in chunks:
+                    elements.append(Paragraph(chunk, styles['ChatContent']))
+            else:
+                elements.append(Paragraph(content, styles['ChatContent']))
+        
+        elements.append(Spacer(1, 0.2*inch))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         if message["role"] == "assistant":
@@ -699,11 +780,33 @@ with st.sidebar.expander("🔍 Debug Info", expanded=False):
 
 with st.container():
     st.markdown('<div class="restart-btn">', unsafe_allow_html=True)
-    _, _, _, right_col = st.columns([6, 1, 1, 1])
-    with right_col:
-        st.button(
-            "Restart",
-            icon=":material/refresh:",
-            on_click=clear_conversation,
-        )
+    
+    # Show both Save PDF and Restart buttons if there's chat history
+    if len(st.session_state.messages) > 0:
+        _, _, save_col, restart_col = st.columns([6, 1, 1, 1])
+        with save_col:
+            pdf_buffer = generate_chat_pdf()
+            st.download_button(
+                label="Save PDF",
+                data=pdf_buffer,
+                file_name=f"iitj_chat_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf",
+                icon=":material/download:",
+            )
+        with restart_col:
+            st.button(
+                "Restart",
+                icon=":material/refresh:",
+                on_click=clear_conversation,
+            )
+    else:
+        # Only show Restart button if no chat history
+        _, _, _, right_col = st.columns([6, 1, 1, 1])
+        with right_col:
+            st.button(
+                "Restart",
+                icon=":material/refresh:",
+                on_click=clear_conversation,
+            )
+    
     st.markdown('</div>', unsafe_allow_html=True)
