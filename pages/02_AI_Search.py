@@ -677,6 +677,8 @@ width: 100%;
 background-color: #2C1E5B;
 color: white;
 text-align: center;
+z-index: 999;
+padding: 10px 0;
 }
 </style>
 <div class="footer">
