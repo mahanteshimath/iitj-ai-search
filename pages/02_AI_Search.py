@@ -225,6 +225,37 @@ with title_row:
 
 st.caption("This is a smart way to Search IITJ Documents using AI")
 
+# Footer - placed early to ensure it always renders
+footer = """<style>
+.footer {
+position: fixed;
+left: 0;
+bottom: 0;
+width: 100%;
+background-color: #2C1E5B;
+color: white;
+text-align: center;
+z-index: 9999;
+padding: 10px 0;
+box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+.footer p {
+margin: 0;
+}
+.footer a {
+color: white;
+text-decoration: none;
+}
+.footer a:hover {
+text-decoration: underline;
+}
+</style>
+<div class="footer">
+<p>Developed with ❤️ by <a style='display: inline; text-align: center;' href="https://bit.ly/atozaboutdata" target="_blank">MAHANTESH HIREMATH</a></p>
+</div>
+"""
+st.markdown(footer, unsafe_allow_html=True)
+
 st.sidebar.title("Select Models")
 selected_model = st.sidebar.selectbox("Model", LLM_MODELS, index=0)
 
@@ -666,23 +697,3 @@ with st.container():
             on_click=clear_conversation,
         )
     st.markdown('</div>', unsafe_allow_html=True)
-
-
-footer = """<style>
-.footer {
-position: fixed;
-left: 0;
-bottom: 0;
-width: 100%;
-background-color: #2C1E5B;
-color: white;
-text-align: center;
-z-index: 999;
-padding: 10px 0;
-}
-</style>
-<div class="footer">
-<p>Developed with ❤️ by <a style='display: inline; text-align: center;' href="https://bit.ly/atozaboutdata" target="_blank">MAHANTESH HIREMATH</a></p>
-</div>
-"""
-st.markdown(footer, unsafe_allow_html=True)
