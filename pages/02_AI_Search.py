@@ -597,7 +597,7 @@ st.markdown(footer, unsafe_allow_html=True)
 
 # Debug Info Section - Placed at bottom so it shows current search results
 st.markdown("---")
-with st.expander("🔍 Debug Info", expanded=False):
+with st.st.sidebar.expander("🔍 Debug Info", expanded=False):
     last_question = st.session_state.get("last_search_question")
     if last_question:
         st.write(f"**Last question:** {last_question}")
