@@ -100,8 +100,6 @@ SCHEMA = "MH"
 SEARCH_SERVICE = "IITJ_AI_SEARCH"
 HISTORY_LENGTH = 5
 
-# Demo video link
-st.info("🎥 [Watch Demo Video](https://youtu.be/HNIVDPFXLtc) to see how this application works!", icon="▶️")
 FEEDBACK_TABLE = "IITJ_RAG_FEEDBACK"
 LLM_MODELS = [
     "claude-3-5-sonnet",
@@ -245,7 +243,7 @@ with title_row:
         width="stretch",
     )
 
-st.caption("This is a smart way to Search information about IITJ using AI")
+st.caption("This is a smart way to Search information about IITJ using AI. 🎥 [Watch Demo Video](https://youtu.be/HNIVDPFXLtc)")
 
 # Footer - placed early to ensure it always renders
 footer = """<style>
