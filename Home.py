@@ -50,6 +50,9 @@ if "snowflake_session" not in st.session_state:
     st.balloons()
     st.toast("Connected to ☁️", icon="✅")
 
+# Demo video link
+st.info("🎥 [Watch Demo Video](https://youtu.be/HNIVDPFXLtc) to see how this application works!", icon="▶️")
+
 # Pages
 curate = st.Page("pages/01_Curate_Information.py", title="Curate Information", icon="📋", default=True)
 ai_search = st.Page("pages/02_AI_Search.py", title="AI Search", icon="🔍")

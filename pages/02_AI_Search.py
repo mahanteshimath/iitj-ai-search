@@ -99,6 +99,9 @@ DB = "IITJ"
 SCHEMA = "MH"
 SEARCH_SERVICE = "IITJ_AI_SEARCH"
 HISTORY_LENGTH = 5
+
+# Demo video link
+st.info("🎥 [Watch Demo Video](https://youtu.be/HNIVDPFXLtc) to see how this application works!", icon="▶️")
 FEEDBACK_TABLE = "IITJ_RAG_FEEDBACK"
 LLM_MODELS = [
     "claude-3-5-sonnet",
@@ -118,6 +121,8 @@ INSTRUCTIONS = textwrap.dedent("""
     - If the search results don't contain relevant information, say so clearly.
     - DO NOT include source links or URLs in your response - they will be added automatically.
     - Don't say things like "according to the provided context" or "based on the search results".
+    - If no relevant information is found, respond with "I'm sorry, I couldn't find any information on that topic in the provided documents. Recheck list of documents(URL) uploaded or connect with Mahantesh(m25ai2134@iitj.ac.in) for more information."
+
 """)
 
 # Define helper functions early (before they're used in sidebar)

@@ -26,6 +26,9 @@ if logo_path.exists():
 st.title(":material/description: Upload documents to IITJ Smart Search")
 st.caption("Upload any file, store and search")
 
+# Demo video link
+st.info("🎥 [Watch Demo Video](https://youtu.be/HNIVDPFXLtc) to see how this application works!", icon="▶️")
+
 # Footer - placed early to ensure it always renders
 footer = """<style>
 .footer {
