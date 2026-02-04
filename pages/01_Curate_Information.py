@@ -327,9 +327,13 @@ with st.container(border=True):
         help="Provide the source link for this document."
     )
 
+    # Allowed file types
+    ALLOWED_EXTENSIONS = ['pdf', 'pptx', 'docx', 'jpeg', 'jpg', 'png', 'tiff', 'tif', 'html', 'txt']
+    ALLOWED_EXTENSIONS_DISPLAY = "PDF, PPTX, DOCX, JPEG, JPG, PNG, TIFF, TIF, HTML, TXT"
+
     uploaded_file = st.file_uploader(
         "Choose a file",
-        help="Any file type is supported."
+        help=f"Supported file types: {ALLOWED_EXTENSIONS_DISPLAY}"
     )
 
     if uploaded_file:
@@ -348,9 +352,14 @@ with st.container(border=True):
             st.stop()
 
         file_name = uploaded_file.name
-        file_ext = os.path.splitext(file_name)[1].lstrip(".")
+        file_ext = os.path.splitext(file_name)[1].lstrip(".").lower()
         file_size = uploaded_file.size
         description = short_description.strip() or file_name
+
+        # Validate file type
+        if file_ext not in ALLOWED_EXTENSIONS:
+            st.error(f"❌ File type '.{file_ext}' is not supported. Please upload only: {ALLOWED_EXTENSIONS_DISPLAY}")
+            st.stop()
 
         with st.spinner(":material/upload: Uploading files to ☁️..."):
             try:

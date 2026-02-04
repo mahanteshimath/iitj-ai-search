@@ -4,3 +4,4 @@ snowflake-snowpark-python
 pypdf
 htbuilder
 reportlab
+perplexityai
