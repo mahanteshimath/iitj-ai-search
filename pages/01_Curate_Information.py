@@ -217,6 +217,33 @@ with st.container(border=True):
 
 st.markdown("---")
 
+# Signup function
+def signup_user(email: str, password: str, mobile_number: str) -> bool:
+    """Register new user in the requestor table"""
+    try:
+        # Check if user already exists in requestor table
+        check_query = f"""
+        SELECT COUNT(*) as count
+        FROM {DATABASE}.{SCHEMA}.IITJ_DOCUMENT_CURATOR_REQUESTOR
+        WHERE UER_EMAIL = ?
+        """
+        result = session.sql(check_query, params=[email]).collect()
+        if result[0]['COUNT'] > 0:
+            st.error("User already registered. Please wait for approval.")
+            return False
+
+        # Insert new user into requestor table
+        insert_query = f"""
+        INSERT INTO {DATABASE}.{SCHEMA}.IITJ_DOCUMENT_CURATOR_REQUESTOR
+        (UER_EMAIL, PASSWORD, MOBILE_NUMBER)
+        VALUES (?, ?, ?)
+        """
+        session.sql(insert_query, params=[email, password, mobile_number]).collect()
+        return True
+    except Exception as exc:
+        st.error(f"Signup error: {exc}")
+        return False
+
 # Authentication Section
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -237,27 +264,52 @@ with st.sidebar:
 
 with st.container(border=True):
     st.subheader(":material/upload: Upload a file")
-    
-    # Show login form if not authenticated
+
+    # Show login/signup form if not authenticated
     if not st.session_state.authenticated:
-        st.info("Please login to upload files")
-        
-        with st.form("login_form"):
-            login_email = st.text_input("Email", placeholder="your.email@iitj.ac.in")
-            login_password = st.text_input("Password", type="password")
-            login_submit = st.form_submit_button("🔓 Login", type="primary")
-            
-            if login_submit:
-                if not login_email.strip() or not login_password.strip():
-                    st.error("Please enter both email and password")
-                else:
-                    if authenticate_user(login_email.strip(), login_password.strip()):
-                        st.session_state.authenticated = True
-                        st.session_state.user_email = login_email.strip()
-                        st.success("Login successful!")
-                        st.rerun()
+        st.info("Please login to upload files or sign up for access")
+
+        # Create tabs for Login and Signup
+        login_tab, signup_tab = st.tabs(["🔓 Login", "📝 Sign Up"])
+
+        with login_tab:
+            with st.form("login_form"):
+                login_email = st.text_input("Email", placeholder="your.email@iitj.ac.in", key="login_email")
+                login_password = st.text_input("Password", type="password", key="login_password")
+                login_submit = st.form_submit_button("🔓 Login", type="primary")
+
+                if login_submit:
+                    if not login_email.strip() or not login_password.strip():
+                        st.error("Please enter both email and password")
                     else:
-                        st.error("Invalid email or password")
+                        if authenticate_user(login_email.strip(), login_password.strip()):
+                            st.session_state.authenticated = True
+                            st.session_state.user_email = login_email.strip()
+                            st.success("Login successful!")
+                            st.rerun()
+                        else:
+                            st.error("Invalid email or password. If you haven't signed up, please use the Sign Up tab.")
+
+        with signup_tab:
+            with st.form("signup_form"):
+                signup_email = st.text_input("Email", placeholder="your.email@iitj.ac.in", key="signup_email")
+                signup_password = st.text_input("Password", type="password", key="signup_password")
+                signup_confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm_password")
+                signup_mobile = st.text_input("Mobile Number", placeholder="+91-XXXXXXXXXX", key="signup_mobile")
+                signup_submit = st.form_submit_button("📝 Sign Up", type="primary")
+
+                if signup_submit:
+                    if not signup_email.strip() or not signup_password.strip() or not signup_mobile.strip():
+                        st.error("Please fill in all fields")
+                    elif signup_password != signup_confirm_password:
+                        st.error("Passwords do not match")
+                    elif not signup_email.strip().lower().endswith("@iitj.ac.in"):
+                        st.error("Please use your IITJ email address (@iitj.ac.in)")
+                    else:
+                        if signup_user(signup_email.strip(), signup_password.strip(), signup_mobile.strip()):
+                            st.success("✅ Signup successful!")
+                            st.info("📋 Your request has been submitted. You will be approved to upload files within 24 hours. Please check back later and use the Login tab once approved.")
+                            st.balloons()
         st.stop()
 
     # Upload form (only shown if authenticated)
