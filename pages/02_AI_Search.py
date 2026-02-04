@@ -667,22 +667,30 @@ if user_message:
         # Get LLM response
         with st.spinner("Thinking..."):
             response = get_response(full_prompt, selected_model)
-        
-        # Append source documents at the end (extracted from search results, NOT from LLM)
-        if source_documents:
+
+        # Check if the response indicates no information was found
+        no_info_indicators = [
+            "couldn't find any information",
+            "no relevant information",
+            "don't have information",
+            "no information available",
+            "couldn't locate any information"
+        ]
+
+        response_lower = response.lower()
+        has_no_information = any(indicator in response_lower for indicator in no_info_indicators)
+
+        # Only append source documents if we actually found relevant information
+        if not has_no_information and source_documents:
             response += "\n\n---\n\n"
             if len(source_documents) == 1:
                 response += "### 📚 Source\n\n"
             else:
                 response += f"### 📚 Sources ({len(source_documents)} documents)\n\n"
-            
+
             for idx, doc in enumerate(source_documents, 1):
                 response += f"{idx}. **{doc['title']}**  \n"
                 response += f"   🔗 [{doc['url']}]({doc['url']})\n\n"
-        else:
-            response += "\n\n---\n\n"
-            response += "### 📚 Source\n\n"
-            response += "*No source documents found*"
         
         # Display the response and save to history
         with st.container():
