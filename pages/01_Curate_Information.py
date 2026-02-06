@@ -314,98 +314,158 @@ with st.container(border=True):
 
     # Upload form (only shown if authenticated)
     st.success(f"Logged in as: {st.session_state.user_email}")
-    
+
     uploaded_by = st.text_input("Uploaded by", value=st.session_state.user_email, disabled=True)
-    short_description = st.text_input(
-        "Short description",
-        placeholder="Brief description (optional)",
-        help="If left empty, file name will be used."
-    )
-    source_url = st.text_input(
-        "Source URL",
-        placeholder="https://...",
-        help="Provide the source link for this document."
-    )
 
     # Allowed file types
     ALLOWED_EXTENSIONS = ['pdf', 'pptx', 'docx', 'jpeg', 'jpg', 'png', 'tiff', 'tif', 'html', 'txt']
     ALLOWED_EXTENSIONS_DISPLAY = "PDF, PPTX, DOCX, JPEG, JPG, PNG, TIFF, TIF, HTML, TXT"
 
-    uploaded_file = st.file_uploader(
-        "Choose a file",
+    uploaded_files = st.file_uploader(
+        "Choose files (max 5)",
+        accept_multiple_files=True,
         help=f"Supported file types: {ALLOWED_EXTENSIONS_DISPLAY}"
     )
 
-    if uploaded_file:
-        st.write(f"**File:** {uploaded_file.name}")
-        st.write(f"**Size:** {uploaded_file.size / (1024 * 1024):.2f} MB")
+    # Display uploaded files and collect metadata for each
+    file_metadata = []
+    if uploaded_files:
+        if len(uploaded_files) > 5:
+            st.error("❌ Maximum 5 files allowed. Please select up to 5 files only.")
+            st.stop()
+
+        st.write(f"**{len(uploaded_files)} file(s) selected:**")
+        st.markdown("---")
+
+        for idx, uploaded_file in enumerate(uploaded_files, 1):
+            with st.expander(f"📄 File {idx}: {uploaded_file.name}", expanded=True):
+                st.write(f"**Size:** {uploaded_file.size / (1024 * 1024):.2f} MB")
+
+                # Validate file type
+                file_ext = os.path.splitext(uploaded_file.name)[1].lstrip(".").lower()
+                if file_ext not in ALLOWED_EXTENSIONS:
+                    st.error(f"❌ File type '.{file_ext}' is not supported. Supported types: {ALLOWED_EXTENSIONS_DISPLAY}")
+                    continue
+                else:
+                    st.success(f"✅ Valid file type: .{file_ext}")
+
+                short_description = st.text_input(
+                    "Short description (optional)",
+                    placeholder=f"Brief description for {uploaded_file.name}",
+                    help="If left empty, file name will be used.",
+                    key=f"desc_{idx}_{uploaded_file.name}"
+                )
+
+                source_url = st.text_input(
+                    "Source URL *",
+                    placeholder="https://...",
+                    help=f"Required: Provide the source link for {uploaded_file.name}",
+                    key=f"url_{idx}_{uploaded_file.name}"
+                )
+
+                file_metadata.append({
+                    'file': uploaded_file,
+                    'name': uploaded_file.name,
+                    'size': uploaded_file.size,
+                    'ext': file_ext,
+                    'description': short_description.strip() or uploaded_file.name,
+                    'source_url': source_url.strip()
+                })
 
     if st.button(":material/cloud_upload: Upload to ☁️", type="primary"):
         if not st.session_state.authenticated:
             st.error("Please login to upload files.")
             st.stop()
-        if not uploaded_file:
-            st.error("Please choose a file to upload.")
-            st.stop()
-        if not source_url.strip():
-            st.error("Please provide the source URL.")
+
+        if not uploaded_files:
+            st.error("Please choose at least one file to upload.")
             st.stop()
 
-        file_name = uploaded_file.name
-        file_ext = os.path.splitext(file_name)[1].lstrip(".").lower()
-        file_size = uploaded_file.size
-        description = short_description.strip() or file_name
-
-        # Validate file type
-        if file_ext not in ALLOWED_EXTENSIONS:
-            st.error(f"❌ File type '.{file_ext}' is not supported. Please upload only: {ALLOWED_EXTENSIONS_DISPLAY}")
+        if len(uploaded_files) > 5:
+            st.error("❌ Maximum 5 files allowed.")
             st.stop()
 
-        with st.spinner(":material/upload: Uploading files to ☁️..."):
-            try:
-                staged_name = file_name
-                file_stream = io.BytesIO(uploaded_file.getvalue())
-                session.file.put_stream(
-                    file_stream,
-                    f"{STAGE_NAME}/{staged_name}",
-                    overwrite=True,
-                    auto_compress=False,
-                )
-            except Exception as exc:
-                st.error(f"Upload failed: {exc}")
-                st.stop()
+        # Validate all files before uploading
+        validation_errors = []
+        for idx, meta in enumerate(file_metadata, 1):
+            if meta['ext'] not in ALLOWED_EXTENSIONS:
+                validation_errors.append(f"File {idx} ({meta['name']}): Unsupported file type '.{meta['ext']}'")
+            if not meta['source_url']:
+                validation_errors.append(f"File {idx} ({meta['name']}): Source URL is required")
 
-        with st.spinner(":material/database: Writing metadata to ☁️..."):
-            try:
-                insert_sql = f"""
-                INSERT INTO {DATABASE}.{SCHEMA}.{TABLE_NAME}
-                (FILE_NAME, SHORT_DESCRIPTION, SOURCE_URL, FILE_TYPE, FILE_SIZE, UPLOADED_BY)
-                SELECT
-                    ?, ?, ?, ?, ?, ?
-                """
-                session.sql(
-                    insert_sql,
-                    params=[
-                        file_name,
-                        description,
-                        source_url.strip(),
-                        file_ext,
-                        file_size,
-                        st.session_state.user_email,
-                    ],
-                ).collect()
-                st.success("File uploaded and metadata saved.")
-            except Exception as exc:
-                st.error(f"Metadata insert failed: {exc}")
-                st.stop()
+        if validation_errors:
+            st.error("❌ Please fix the following errors:")
+            for error in validation_errors:
+                st.error(f"  • {error}")
+            st.stop()
 
-        with st.spinner(":material/auto_awesome: Generating embeddings..."):
+        # Upload all files
+        uploaded_count = 0
+        failed_count = 0
+
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        for idx, meta in enumerate(file_metadata, 1):
+            status_text.text(f"Processing file {idx}/{len(file_metadata)}: {meta['name']}")
+
             try:
-                session.sql(f"LIST {STAGE_NAME}").collect()
-                session.sql(
-                    "CALL IITJ.MH.GENERATE_EMBEDDINGS_FOR_NEW_FILE(?)",
-                    params=[file_name],
-                ).collect()
-                st.success(f"Embeddings generated for {file_name}. You can start searching now!")
+                # Upload file to stage
+                with st.spinner(f"Uploading {meta['name']} to ☁️..."):
+                    file_stream = io.BytesIO(meta['file'].getvalue())
+                    session.file.put_stream(
+                        file_stream,
+                        f"{STAGE_NAME}/{meta['name']}",
+                        overwrite=True,
+                        auto_compress=False,
+                    )
+
+                # Insert metadata
+                with st.spinner(f"Saving metadata for {meta['name']}..."):
+                    insert_sql = f"""
+                    INSERT INTO {DATABASE}.{SCHEMA}.{TABLE_NAME}
+                    (FILE_NAME, SHORT_DESCRIPTION, SOURCE_URL, FILE_TYPE, FILE_SIZE, UPLOADED_BY)
+                    SELECT
+                        ?, ?, ?, ?, ?, ?
+                    """
+                    session.sql(
+                        insert_sql,
+                        params=[
+                            meta['name'],
+                            meta['description'],
+                            meta['source_url'],
+                            meta['ext'],
+                            meta['size'],
+                            st.session_state.user_email,
+                        ],
+                    ).collect()
+
+                # Generate embeddings
+                with st.spinner(f"Generating embeddings for {meta['name']}..."):
+                    session.sql(f"LIST {STAGE_NAME}").collect()
+                    session.sql(
+                        "CALL IITJ.MH.GENERATE_EMBEDDINGS_FOR_NEW_FILE(?)",
+                        params=[meta['name']],
+                    ).collect()
+
+                uploaded_count += 1
+                st.success(f"✅ {meta['name']} uploaded successfully!")
+
             except Exception as exc:
-                st.error(f"Embedding generation failed: {exc}")
+                failed_count += 1
+                st.error(f"❌ Failed to upload {meta['name']}: {exc}")
+
+            progress_bar.progress((idx) / len(file_metadata))
+
+        status_text.empty()
+        progress_bar.empty()
+
+        # Final summary
+        st.markdown("---")
+        if uploaded_count == len(file_metadata):
+            st.success(f"🎉 All {uploaded_count} file(s) uploaded successfully! You can start searching now!")
+            st.balloons()
+        elif uploaded_count > 0:
+            st.warning(f"⚠️ {uploaded_count} file(s) uploaded successfully, {failed_count} failed.")
+        else:
+            st.error(f"❌ All uploads failed. Please try again.")
