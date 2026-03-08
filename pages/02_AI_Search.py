@@ -2,9 +2,8 @@ import streamlit as st
 from htbuilder.units import rem
 from htbuilder import div, styles
 from pathlib import Path
+import json
 from snowflake.snowpark.context import get_active_session
-from snowflake.core import Root
-from snowflake.cortex import complete
 import textwrap
 import requests
 from io import BytesIO
@@ -83,8 +82,6 @@ def get_or_refresh_session():
     return session
 
 session = get_or_refresh_session()
-
-root = Root(session)
 
 # Validate connection
 with st.sidebar:
@@ -455,25 +452,42 @@ def show_feedback_controls(message_index):
                     st.error(f"Failed to store feedback: {exc}")
 
 def run_search(question: str) -> list[dict]:
-    cortex_search_service = (
-        root.databases[DB].schemas[SCHEMA].cortex_search_services[SEARCH_SERVICE]
-    )
-    if indexed_columns and selected_columns:
-        return cortex_search_service.search(
-            question,
-            columns=selected_columns,
-            filter={},
-            limit=limit,
-        ).results
+    columns = selected_columns if indexed_columns and selected_columns else [
+        'CHUNK', 'SOURCE_URL', 'FILE_NAME', 'SHORT_DESCRIPTION'
+    ]
+    payload = json.dumps({
+        "query": question,
+        "columns": columns,
+        "filter": {},
+        "limit": limit,
+    })
 
-    # Fallback - use all indexed columns or default essential columns
-    cols = selected_columns if selected_columns else ['CHUNK', 'SOURCE_URL', 'FILE_NAME', 'SHORT_DESCRIPTION']
-    return cortex_search_service.search(
-        question,
-        columns=cols,
-        filter={},
-        limit=limit,
-    ).results
+    response = session.sql(
+        f"""
+        SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+            '{DB}.{SCHEMA}.{SEARCH_SERVICE}',
+            ?
+        ) AS RESPONSE
+        """,
+        params=[payload],
+    ).collect()
+
+    if not response:
+        return []
+
+    raw_response = response[0]["RESPONSE"] if isinstance(response[0], dict) else response[0][0]
+
+    if isinstance(raw_response, str):
+        parsed_response = json.loads(raw_response)
+    elif hasattr(raw_response, "as_dict"):
+        parsed_response = raw_response.as_dict()
+    else:
+        parsed_response = raw_response
+
+    if isinstance(parsed_response, dict):
+        return parsed_response.get("results", [])
+
+    return []
 
 if not user_first_interaction and not has_message_history:
     with st.container():
