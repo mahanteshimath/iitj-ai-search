@@ -163,6 +163,75 @@ def extract_result_text(value):
         return clean_text(value)
     return clean_text(value)
 
+def tokenize_text(text: str) -> list[str]:
+    if not text:
+        return []
+    normalized = "".join(ch.lower() if ch.isalnum() or ch.isspace() else " " for ch in text)
+    return [tok for tok in normalized.split() if tok]
+
+def is_searchable_question(question: str) -> bool:
+    """Return True only when query looks like an information need we should retrieve for."""
+    if not question or not question.strip():
+        return False
+
+    q = question.strip().lower()
+    q_tokens = tokenize_text(q)
+    if not q_tokens:
+        return False
+
+    # Common conversational messages where retrieval should be skipped.
+    smalltalk_exact = {
+        "hi", "hello", "hey", "test", "testing", "ok", "okay", "thanks", "thank you",
+        "good morning", "good afternoon", "good evening", "yo", "hii", "hlo"
+    }
+    if q in smalltalk_exact:
+        return False
+
+    # If very short and without clear academic intent, avoid retrieval.
+    intent_terms = {
+        "iitj", "iit", "jodhpur", "faculty", "professor", "department", "research",
+        "course", "program", "admission", "email", "contact", "lab", "publication",
+        "show", "list", "who", "what", "when", "where", "which", "how", "give", "tell", "explain"
+    }
+    has_intent = any(tok in intent_terms for tok in q_tokens) or "?" in question
+    if len(q_tokens) <= 2 and not has_intent:
+        return False
+
+    return has_intent or len(q_tokens) >= 3
+
+def get_query_terms(question: str) -> set[str]:
+    stopwords = {
+        "the", "a", "an", "is", "are", "was", "were", "be", "to", "of", "and", "or", "for",
+        "in", "on", "at", "by", "with", "about", "from", "as", "that", "this", "it", "i",
+        "you", "we", "they", "he", "she", "me", "my", "our", "your", "please", "can", "could",
+        "would", "should", "do", "does", "did", "tell", "give", "show", "list", "what", "who",
+        "when", "where", "which", "how"
+    }
+    return {tok for tok in tokenize_text(question) if len(tok) >= 3 and tok not in stopwords}
+
+def is_result_relevant_to_question(question: str, row_dict: dict) -> bool:
+    """Simple lexical relevance filter to avoid showing unrelated source links."""
+    query_terms = get_query_terms(question)
+    if not query_terms:
+        return False
+
+    title = (
+        row_dict.get("SHORT_DESCRIPTION")
+        or row_dict.get("short_description")
+        or row_dict.get("FILE_NAME")
+        or row_dict.get("file_name")
+        or ""
+    )
+    chunk = extract_result_text(
+        row_dict.get("CHUNK")
+        or row_dict.get("chunk")
+        or row_dict.get("CONTENT")
+        or row_dict.get("content")
+    ) or ""
+
+    searchable_text = f"{title} {chunk[:2000]}".lower()
+    return any(term in searchable_text for term in query_terms)
+
 def get_indexed_columns() -> list[str]:
     try:
         rows = session.sql(
@@ -616,44 +685,45 @@ if user_message:
         st.text(user_message)
 
     with st.chat_message("assistant"):
-        # Search for relevant context
+        should_search = is_searchable_question(user_message)
+
+        # Search for relevant context only when query is likely an info request.
         with st.spinner("Searching documents..."):
             try:
-                search_result = run_search(user_message)
-                # Convert to list if needed and store IMMEDIATELY
-                if search_result:
-                    results = list(search_result) if not isinstance(search_result, list) else search_result
+                if should_search:
+                    search_result = run_search(user_message)
+                    # Convert to list if needed and store IMMEDIATELY
+                    if search_result:
+                        results = list(search_result) if not isinstance(search_result, list) else search_result
+                    else:
+                        results = []
                 else:
                     results = []
-                
+
                 # Store results for debug panel (must happen before any processing)
                 st.session_state.last_search_results = results
                 st.session_state.last_search_error = None
-                
-                search_context = build_search_context(results)
+
+                search_context = build_search_context(results) if results else "No relevant documents found."
                 st.session_state.last_search_context = search_context  # Store context for debug
-                
-                # Extract all unique sources with their metadata (not controlled by LLM)
-                # Cortex Search returns results with fields at TOP LEVEL (not in attributes)
+
+                # Extract unique sources with additional relevance filter.
                 source_documents = []
                 seen_urls = set()
-                
+
                 for row in results:
                     row_dict = normalize_row(row)
-                    
-                    # Extract URL - check TOP LEVEL FIRST (this is where Snowflake puts it)
-                    url = (
-                        row_dict.get("SOURCE_URL") 
-                        or row_dict.get("source_url")
-                    )
-                    
-                    # Skip if no URL or already seen
+
+                    # Keep only rows that are lexically relevant to user's query.
+                    if not is_result_relevant_to_question(user_message, row_dict):
+                        continue
+
+                    url = row_dict.get("SOURCE_URL") or row_dict.get("source_url")
                     if not url or url in seen_urls:
                         continue
-                    
+
                     seen_urls.add(url)
-                    
-                    # Extract document title - check TOP LEVEL FIRST
+
                     title = (
                         row_dict.get("SHORT_DESCRIPTION")
                         or row_dict.get("short_description")
@@ -661,12 +731,12 @@ if user_message:
                         or row_dict.get("file_name")
                         or "Document"
                     )
-                    
+
                     source_documents.append({
                         "title": clean_text(title) if title else "Document",
                         "url": str(url)
                     })
-                    
+
             except Exception as exc:
                 search_context = f"Error searching documents: {exc}"
                 st.session_state.last_search_error = str(exc)
@@ -691,11 +761,21 @@ if user_message:
             "couldn't locate any information"
         ]
 
+        clarification_indicators = [
+            "please ask a specific question",
+            "could you please ask",
+            "to assist you better, please ask",
+            "provide a clear question",
+            "ask a specific question"
+        ]
+
         response_lower = response.lower()
         has_no_information = any(indicator in response_lower for indicator in no_info_indicators)
+        asks_for_clarification = any(indicator in response_lower for indicator in clarification_indicators)
 
-        # Only append source documents if we actually found relevant information
-        if not has_no_information and source_documents:
+        # Only append sources for relevant retrieved answers.
+        can_show_sources = should_search and not has_no_information and not asks_for_clarification and len(source_documents) > 0
+        if can_show_sources:
             response += "\n\n---\n\n"
             if len(source_documents) == 1:
                 response += "### 📚 Source\n\n"
