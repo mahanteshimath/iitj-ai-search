@@ -99,7 +99,7 @@ HISTORY_LENGTH = 5
 
 FEEDBACK_TABLE = "IITJ_RAG_FEEDBACK"
 LLM_MODELS = [
-    "claude-3-5-sonnet",
+    "claude-4-6-sonnet",
     # "llama3-70b",
     "claude-4-sonnet"
 ]
